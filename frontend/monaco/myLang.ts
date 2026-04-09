@@ -29,29 +29,41 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
   monaco.languages.setMonarchTokensProvider('csgl', {
     defaultToken: '',
     tokenPostfix: '.csgl',
+    // keywords (control + DSL operations)
     keywords: [
-      'difference', 'union', 'translate', 'rotate', 'scale', 'cube', 'sphere', 'cylinder',
-      'module', 'import', 'export', 'let', 'in', 'if', 'else', 'for', 'return', 'function'
+      'let', 'in', 'if', 'else', 'for', 'return', 'function', 'module', 'import', 'export',
+      'union', 'difference', 'intersection', 'translate', 'rotate', 'scale', 'color'
     ],
+    // Recognize constructors / primitive names (capitalized)
+    primitives: ['Sphere', 'Cube', 'Cylinder'],
     tokenizer: {
       root: [
+        // Constructors / primitive types (capitalized identifiers)
+        [/[A-Z][\w]*/, {
+          cases: {
+            '@primitives': 'type',
+            '@default': 'type'
+          }
+        }],
+        // identifiers and keywords
         [/[a-zA-Z_]\w*/, {
           cases: {
             '@keywords': 'keyword',
             '@default': 'identifier'
           }
         }],
-        [/\d+\.?\d*/, 'number'],
+        // numbers: integers, floats, .5, -2.0, -.5
+        [/-?(?:\d+\.\d*|\.\d+|\d+)/, 'number'],
+        // comments
         [/\/\/.*$/, 'comment'],
         [/\/\*/, 'comment', '@comment'],
-        [/"([^"\\]|\\.)*"/, 'string'],
-        [/\'([^'\\]|\\.)*\'/, 'string'],
+        // brackets, delimiters, operators
         [/[{}()\[\]]/, '@brackets'],
-        [/[,;]/, 'delimiter'],
+        [/[;,]/, 'delimiter'],
         [/[+\-*/%=<>!]+/, 'operator']
       ],
       comment: [
-        [/[^^*]+/, 'comment'],
+        [/[^*]+/, 'comment'],
         [/\*\//, 'comment', '@pop'],
         [/./, 'comment']
       ]
@@ -65,15 +77,13 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
       { open: '{', close: '}' },
       { open: '[', close: ']' },
       { open: '(', close: ')' },
-      { open: '"', close: '"' },
-      { open: '\'', close: '\'' }
     ],
     surroundingPairs: [
       { open: '{', close: '}' },
       { open: '[', close: ']' },
-      { open: '(', close: ')' },
-      { open: '"', close: '"' }
-    ]
+      { open: '(', close: ')' }
+    ],
+    // Note: strings are not a primary DSL feature — removed quote pairs
   });
 
   monaco.editor.defineTheme('csglTheme', {
@@ -83,8 +93,8 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
       { token: 'keyword', foreground: 'C586C0', fontStyle: 'bold' },
       { token: 'number', foreground: 'B5CEA8' },
       { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
-      { token: 'string', foreground: 'CE9178' },
-      { token: 'identifier', foreground: '9CDCFE' }
+      { token: 'identifier', foreground: '9CDCFE' },
+      { token: 'type', foreground: '4EC9B0' }
     ],
     colors: {
       'editor.foreground': '#FFFFFF',
