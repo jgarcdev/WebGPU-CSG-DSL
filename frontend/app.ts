@@ -1,14 +1,16 @@
 /// <reference lib="dom" />
 
-import { setupCSGLLanguage, MonacoLike } from './monaco/myLang.ts';
+import { setupCSGLLanguage, MonacoLike } from './monaco/csgl.ts';
+import { webgpuMain } from '../backend/webgpu.ts';
+import compile from "../compiler/compiler.ts";
 
 const editorHost = document.getElementById('editor-host') as HTMLDivElement;
 const btnCompile = document.getElementById('btn-compile') as HTMLButtonElement;
 const btnRun = document.getElementById('btn-run') as HTMLButtonElement;
 const status = document.getElementById('status') as HTMLSpanElement;
 const log = document.getElementById('log') as HTMLDivElement;
-const canvas = document.getElementById('viewport') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d')!;
+const canvas = document.querySelector("canvas") as HTMLCanvasElement;
+let ctx: CanvasRenderingContext2D | null = null;
 type EditorInstance = { getValue(): string };
 
 let monacoEditor: EditorInstance | null = null;
@@ -28,44 +30,47 @@ function getSource() {
 
 btnCompile.addEventListener('click', async () => {
   status.textContent = 'Compiling...';
-  appendLog('Sending compile request');
+  // This will call the `compile` function, passing in the source code from `getSource()`
+  // The function may throw an error if there are compilation issues, which will need to be displayed in the UI (e.g. in the `log` element)
   try {
-    const resp = await fetch('/compile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: getSource() })
-    });
-    const data = await resp.json();
-    if (data.ok) {
-      status.textContent = 'Compiled';
-      appendLog('Compile OK');
-    } else {
-      status.textContent = 'Compile error';
-      appendLog('Compile error', JSON.stringify(data, null, 2));
-    }
+    const result = await compile(getSource());
+    appendLog('Compilation successful');
+    status.textContent = 'Compilation successful';
   } catch (err) {
-    status.textContent = 'Error';
-    appendLog('Compile failed', String(err));
+    appendLog('Compilation error', String(err));
+    status.textContent = 'Compilation error';
   }
 });
 
-btnRun.addEventListener('click', () => {
-  status.textContent = 'Running (local preview)';
-  // Placeholder renderer: simple gradient to show output
-  const w = canvas.width = 640;
-  const h = canvas.height = 480;
-  const image = ctx.createImageData(w, h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      image.data[i] = (x / w) * 255;
-      image.data[i + 1] = (y / h) * 160;
-      image.data[i + 2] = 200;
-      image.data[i + 3] = 255;
+btnRun.addEventListener('click', async () => {
+  status.textContent = 'Running (WebGPU preview)';
+  try {
+    await webgpuMain(canvas, (msg) => appendLog(msg));
+    appendLog('WebGPU placeholder ran');
+  } catch (err) {
+    status.textContent = 'WebGPU error';
+    appendLog('WebGPU failed', String(err));
+    // fallback: simple 2D gradient to show output (get 2D context lazily)
+    const w = canvas.width = 640;
+    const h = canvas.height = 480;
+    const ctx2 = ctx ?? canvas.getContext('2d');
+    if (!ctx2) {
+      appendLog('2D context unavailable for fallback');
+      return;
     }
+    ctx = ctx2;
+    const image = ctx2.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        image.data[i] = (x / w) * 255;
+        image.data[i + 1] = (y / h) * 160;
+        image.data[i + 2] = 200;
+        image.data[i + 3] = 255;
+      }
+    }
+    ctx2.putImageData(image, 0, 0);
   }
-  ctx.putImageData(image, 0, 0);
-  appendLog('Rendered preview (placeholder)');
 });
 
 function waitForRequire(timeout = 3000) {

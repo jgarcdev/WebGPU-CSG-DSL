@@ -1,0 +1,186 @@
+import { LexerError } from './errors.ts';
+
+
+export type TokenType =
+  | 'Identifier'
+  | 'Number'
+  | 'Keyword'
+  | 'LParen'
+  | 'RParen'
+  | 'Comma'
+  | 'Equals'
+  | 'Semicolon'
+  | 'EOL'
+  | 'EOF';
+
+export type Token = {
+  type: TokenType;
+  lexeme: string;
+  line: number;
+  column: number;
+};
+
+export function lex(source: string): Token[] {
+  console.log(`Lexing ${source}`);
+
+  const tokens: Token[] = [];
+  let index = 0;
+  let line = 1;
+  let column = 1;
+
+  const peek = (offset = 0): string => source[index + offset] ?? '';
+
+  const advance = (): string => {
+    const ch = source[index++] ?? '';
+    if (ch === '\n') {
+      line += 1;
+      column = 1;
+    } else {
+      column += 1;
+    }
+    return ch;
+  };
+
+  const addToken = (type: TokenType, lexeme: string, tokenLine: number, tokenColumn: number) => {
+    tokens.push({ type, lexeme, line: tokenLine, column: tokenColumn });
+  };
+
+  const isDigit = (ch: string) => ch >= '0' && ch <= '9';
+  const isLower = (ch: string) => ch >= 'a' && ch <= 'z';
+  const isUpper = (ch: string) => ch >= 'A' && ch <= 'Z';
+  const isLetter = (ch: string) => isLower(ch) || isUpper(ch);
+
+  const readIdentifier = () => {
+    const tokenLine = line;
+    const tokenColumn = column;
+    const start = index;
+    const first = peek();
+    if (!isLetter(first)) {
+      throw new LexerError('Expected identifier', tokenLine, tokenColumn);
+    }
+    advance();
+    while (isLetter(peek()) || isDigit(peek())) {
+      advance();
+    }
+    const lexeme = source.slice(start, index);
+
+    if (lexeme === 'let') {
+      addToken('Keyword', lexeme, tokenLine, tokenColumn);
+      return;
+    }
+
+    addToken('Identifier', lexeme, tokenLine, tokenColumn);
+  };
+
+  const readNumber = () => {
+    const tokenLine = line;
+    const tokenColumn = column;
+    const start = index;
+
+    if (peek() === '-' || peek() === '+') {
+      advance();
+    }
+
+    if (peek() === '.') {
+      advance();
+      if (!isDigit(peek())) {
+        throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+      }
+      while (isDigit(peek())) {
+        advance();
+      }
+    } else {
+      if (!isDigit(peek())) {
+        throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+      }
+      while (isDigit(peek())) {
+        advance();
+      }
+      if (peek() === '.') {
+        advance();
+        while (isDigit(peek())) {
+          advance();
+        }
+      }
+    }
+
+    const lexeme = source.slice(start, index);
+    addToken('Number', lexeme, tokenLine, tokenColumn);
+  };
+
+  while (index < source.length) {
+    const ch = peek();
+
+    if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n') {
+      if (ch === '\n') {
+        addToken('EOL', ch, line, column);
+      }
+
+      advance();
+      continue;
+    }
+
+    if (ch === '/' && peek(1) === '/') return tokens;
+
+    if (ch === '/' && peek(1) === '*') {
+      const commentLine = line;
+      const commentColumn = column;
+      advance();
+      advance();
+      while (!(peek() === '*' && peek(1) === '/')) {
+        if (peek() === '') {
+          throw new LexerError('Unterminated block comment', commentLine, commentColumn);
+        }
+        advance();
+      }
+      advance();
+      advance();
+      continue;
+    }
+
+    const tokenLine = line;
+    const tokenColumn = column;
+
+    switch (ch) {
+      case '(':
+        addToken('LParen', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      case ')':
+        addToken('RParen', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      case ',':
+        addToken('Comma', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      case '=':
+        addToken('Equals', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      case ';':
+        addToken('Semicolon', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      default:
+        break;
+    }
+
+    if (isLetter(ch)) {
+      readIdentifier();
+      continue;
+    }
+
+    if (ch === '-' || ch === '+' || ch === '.' || isDigit(ch)) {
+      readNumber();
+      continue;
+    }
+
+    throw new LexerError(`Unexpected character '${ch}'`, tokenLine, tokenColumn);
+  }
+
+  // addToken('EOF', '', line, column);
+  return tokens;
+}
+
+export default lex;
