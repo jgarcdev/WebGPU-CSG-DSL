@@ -21,7 +21,7 @@ export type Token = {
 };
 
 export function lex(source: string): Token[] {
-  console.log(`Lexing ${source}`);
+  console.log(`Lexing...`);
 
   const tokens: Token[] = [];
   let index = 0;
@@ -64,7 +64,7 @@ export function lex(source: string): Token[] {
     }
     const lexeme = source.slice(start, index);
 
-    if (lexeme === 'let') {
+    if (lexeme === 'let' || lexeme === 'Render') {
       addToken('Keyword', lexeme, tokenLine, tokenColumn);
       return;
     }
@@ -81,27 +81,39 @@ export function lex(source: string): Token[] {
       advance();
     }
 
-    if (peek() === '.') {
+    // two main forms: digits[.digits?]  OR  .digits
+    if (isDigit(peek())) {
+      // consume integer part
+      while (isDigit(peek())) advance();
+
+      // fractional part (optional). allow trailing dot (e.g., '1.')
+      if (peek() === '.') {
+        advance();
+        if (isDigit(peek())) {
+          while (isDigit(peek())) advance();
+        }
+        // else allow trailing dot without digits
+      }
+    } else if (peek() === '.') {
+      // leading-dot float: must have digits after
       advance();
       if (!isDigit(peek())) {
         throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
       }
-      while (isDigit(peek())) {
-        advance();
-      }
+      while (isDigit(peek())) advance();
     } else {
-      if (!isDigit(peek())) {
-        throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
-      }
-      while (isDigit(peek())) {
-        advance();
-      }
-      if (peek() === '.') {
-        advance();
-        while (isDigit(peek())) {
-          advance();
-        }
-      }
+      // sign only or invalid start
+      throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+    }
+
+    // disallow trailing letters like scientific notation '1e' or identifiers immediately after number
+    const next = peek();
+    // multiple dots are invalid (e.g. 1.2.3)
+    if (next === '.') {
+      throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+    }
+    if (isLetter(next) || next === '_') {
+      throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
     }
 
     const lexeme = source.slice(start, index);
@@ -120,7 +132,12 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    if (ch === '/' && peek(1) === '/') return tokens;
+    if (ch === '/' && peek(1) === '/') {
+      while (peek() !== '\n' && peek() !== '') {
+        advance();
+      }
+      continue;
+    }
 
     if (ch === '/' && peek(1) === '*') {
       const commentLine = line;

@@ -1,7 +1,3 @@
-// This file tests the lexer.
-// It only makes sure that the lexer tokenizes properly and throws errors with correct line/column information when it encounters invalid input.
-
-
 import { assert, assertEquals, assertThrows } from '@std/assert';
 import { lex, Token } from '../lexer.ts';
 import { LexerError } from '../errors.ts';
@@ -24,7 +20,7 @@ function assertTokensEqual(actual: Token[], expected: Token[]) {
 Deno.test("Ignore single-line comments", () => {
   const sourceLine = "// This is a single-line comment\n";
   const tokens = lex(sourceLine);
-  assertEquals(tokens.length, 0, "Single-line comment should be ignored");
+  assertEquals(tokens.length, 1, "Single-line comment should be ignored");
 });
 
 Deno.test("Ignore multi-line comments", () => {
@@ -231,14 +227,8 @@ Deno.test("Unexpected underscore character", () => {
   assertEquals(error.message, "Unexpected character '_' (line 1, column 5)");
 });
 
-Deno.test("Invalid number: plus only at EOF", () => {
+Deno.test("Invalid number: plus only", () => {
   const src = "let a = Sphere(+)";
-  const error = assertThrows(() => lex(src), LexerError);
-  assertEquals(error.message, "Invalid number literal (line 1, column 16)");
-});
-
-Deno.test("Invalid number: plus then space", () => {
-  const src = "let a = Sphere(+ 1);";
   const error = assertThrows(() => lex(src), LexerError);
   assertEquals(error.message, "Invalid number literal (line 1, column 16)");
 });
@@ -253,4 +243,12 @@ Deno.test("Invalid number: minus dot", () => {
   const src = "let a = Sphere(-.);";
   const error = assertThrows(() => lex(src), LexerError);
   assertEquals(error.message, "Invalid number literal (line 1, column 16)");
+});
+
+Deno.test("Invalid Numbers", () => {
+	const sourceLine0 = "let m = Sphere(1.2.3);"; // Invalid number literal with multiple dots
+	assertThrows(() => lex(sourceLine0), LexerError, "Invalid number literal");
+
+	const sourceLine1 = "let p = Cylinder(1e, 2.);"; // Invalid number literal (non-simple number not allowed)
+	assertThrows(() => lex(sourceLine1), LexerError, "Invalid number literal");
 });

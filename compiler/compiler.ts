@@ -1,5 +1,5 @@
 import { lex } from './lexer.ts';
-import { parseTokens } from './parser.ts';
+import { parse } from './parser.ts';
 import { lowerIR } from './csgIR.ts';
 
 
@@ -11,12 +11,13 @@ import { lowerIR } from './csgIR.ts';
  */
 export async function compile(source: string) {
   try {
-    console.log('Compiling source code:', source);
+    console.log('Compiling source code:\n', source);
     const tokens = lex(source);
-    const ast = parseTokens(tokens);
+    const ast = parse(tokens);
     const ir = lowerIR(ast);
     return ir;
   } catch (err) {
+    console.log(err);
     throw err;
   }
 }

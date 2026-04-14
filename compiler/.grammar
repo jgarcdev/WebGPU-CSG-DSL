@@ -1,4 +1,4 @@
-Program         = { Statement } EOF ;
+Program         = { Statement } ;
 
 Statement       = LetStatement
                 | RenderStatement
