@@ -3,6 +3,7 @@
 import { setupCSGLLanguage, MonacoLike } from './monaco/csgl.ts';
 import { webgpuMain } from '../backend/webgpu.ts';
 import compile from "../compiler/compiler.ts";
+import { Warnings } from "../compiler/warnings.ts";
 
 const editorHost = document.getElementById('editor-host') as HTMLDivElement;
 const btnCompile = document.getElementById('btn-compile') as HTMLButtonElement;
@@ -11,9 +12,13 @@ const status = document.getElementById('status') as HTMLSpanElement;
 const log = document.getElementById('log') as HTMLDivElement;
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D | null = null;
-type EditorInstance = { getValue(): string };
+type EditorInstance = any;
 
 let monacoEditor: EditorInstance | null = null;
+let monacoNs: any = null; // hold the global `monaco` namespace
+let monacoEditorInstance: any = null; // full editor instance
+let currentDecorationIds: string[] = [];
+let irCode: string | null = null;
 
 function appendLog(...parts: unknown[]) {
   const p = document.createElement('div');
@@ -30,14 +35,50 @@ function getSource() {
 
 btnCompile.addEventListener('click', async () => {
   status.textContent = 'Compiling...';
-  // This will call the `compile` function, passing in the source code from `getSource()`
-  // The function may throw an error if there are compilation issues, which will need to be displayed in the UI (e.g. in the `log` element)
   try {
-    const result = await compile(getSource());
+    const { ir, warnings } = await compile(getSource());
     appendLog('Compilation successful');
     status.textContent = 'Compilation successful';
+    irCode = ir;
+    const allWarnings = warnings.all();
+    if (allWarnings.length > 0) {
+      appendLog(`Compilation completed with ${allWarnings.length} warning(s):`);
+      allWarnings.forEach((w, i) => appendLog(`  ${i + 1}. ${w.message} (line ${w.line}, column ${w.column})`));
+    } else {
+      appendLog('No warnings');
+    }
+
+    // Show warnings in Monaco (markers + whole-line decorations) when available
+    if (monacoNs && monacoEditorInstance) {
+      try {
+        const model = monacoEditorInstance.getModel();
+        const markers = allWarnings.map((w) => ({
+          severity: monacoNs.MarkerSeverity.Warning,
+          message: w.message,
+          startLineNumber: Math.max(1, w.line || 1),
+          startColumn: Math.max(1, w.column || 1),
+          endLineNumber: Math.max(1, w.line || 1),
+          endColumn: Math.max(1, (w.column || 1) + 1)
+        }));
+
+        monacoNs.editor.setModelMarkers(model, 'csgl', markers);
+
+        const newDecs = allWarnings.map((w) => ({
+          range: new monacoNs.Range(Math.max(1, w.line || 1), 1, Math.max(1, w.line || 1), 1),
+          options: {
+            isWholeLine: true,
+            className: 'csglLineWarning',
+            hoverMessage: { value: `⚠ ${w.message}` }
+          }
+        }));
+
+        currentDecorationIds = monacoEditorInstance.deltaDecorations(currentDecorationIds, newDecs);
+      } catch (e) {
+        appendLog('Failed to set Monaco warnings', String(e));
+      }
+    }
   } catch (err) {
-    appendLog('Compilation error', String(err));
+    appendLog('Compilation error::', String(err));
     status.textContent = 'Compilation error';
   }
 });
@@ -45,7 +86,13 @@ btnCompile.addEventListener('click', async () => {
 btnRun.addEventListener('click', async () => {
   status.textContent = 'Running (WebGPU preview)';
   try {
-    await webgpuMain(canvas, (msg) => appendLog(msg));
+    // Default IR is read from default.csgir
+    const defaultIR = await fetch('/default.csgir').then((resp) => {
+      if (!resp.ok) throw new Error(`Failed to load default IR: ${resp.statusText}`);
+      return resp.text();
+    });
+    const ir = irCode ? irCode : defaultIR;
+    await webgpuMain(canvas, ir, (msg) => appendLog(msg));
     appendLog('WebGPU placeholder ran');
   } catch (err) {
     status.textContent = 'WebGPU error';
@@ -124,6 +171,9 @@ async function initMonacoEditor() {
         minimap: { enabled: false },
         fontSize: 14
       }) as unknown as EditorInstance;
+      // keep references for later decorations/markers
+      monacoNs = monaco;
+      monacoEditorInstance = monacoEditor as any;
 
       appendLog('Monaco ready (CSGL)');
     });
