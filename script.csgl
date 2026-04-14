@@ -1,5 +1,4 @@
 // Sample CSG script demonstrating primitives, transforms, and operations
-// No strings or self-note features are used.
 
 // Primitives
 let sphere = Sphere(1.2)

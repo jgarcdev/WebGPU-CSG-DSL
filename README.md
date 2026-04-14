@@ -34,9 +34,10 @@ There are no variables, loops, conditionals, or statements. This keeps parsing s
 The core geometric primitives:
 
 ```
-sphere(radius)
-cube(size)
-cylinder(radius, height)
+Sphere(radius)
+Cube(size)
+Rectangle(width, height, depth)
+Cylinder(radius, height)
 ```
 
 ### CSG Operations
@@ -67,10 +68,10 @@ scale(x, y, z, shape)
 
 ```
 difference(
-    cube(2),
-    translate(0.5, 0.5, 0.5,
-        sphere(1)
-    )
+  Cube(2),
+  translate(0.5, 0.5, 0.5,
+    Sphere(1)
+  )
 )
 ```
 
@@ -196,10 +197,8 @@ Executes the compiled program on the GPU → displays output.
 
 ## Future Extensions
 
-- Variables and `let` bindings  
-- User‑defined functions  
-- Materials and shading options  
-- Live auto‑compile mode  
-- Mesh export  
-- More primitives (torus, cone, etc.)  
-- Boolean simplification in IR  
+- User‑defined functions
+- Materials and shading options
+- Mesh export
+- More primitives (torus, cone, etc.)
+- Drag scene to view objcts
