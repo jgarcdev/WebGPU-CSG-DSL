@@ -1,6 +1,8 @@
-import { lex } from './lexer.ts';
-import { parse } from './parser.ts';
-import { lowerIR } from './csgIR.ts';
+import { lex } from "./lexer.ts";
+import { parse } from "./parser.ts";
+import { sema } from "./sema.ts";
+import { lowerIR } from "./csgIR.ts";
+import { Warnings } from "./warnings.ts";
 
 
 /**
@@ -9,15 +11,15 @@ import { lowerIR } from './csgIR.ts';
  * @throws CompilerError if there are any compilation errors (lexer, parser, or IR generation)
  * @returns A promise resolving to the compiled IR
  */
-export async function compile(source: string) {
+export async function compile(source: string): Promise<{ ir: string, warnings: Warnings }> {
   try {
     console.log('Compiling source code:\n', source);
     const tokens = lex(source);
     const ast = parse(tokens);
-    const ir = lowerIR(ast);
-    return ir;
+    const { program, warnings } = sema(ast); 
+    const ir = lowerIR(program);
+    return { ir, warnings };
   } catch (err) {
-    console.log(err);
     throw err;
   }
 }
