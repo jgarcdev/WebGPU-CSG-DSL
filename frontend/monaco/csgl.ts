@@ -31,11 +31,11 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
     tokenPostfix: '.csgl',
     // keywords (control + DSL operations)
     keywords: [
-      'let', 'in', 'if', 'else', 'for', 'return', 'function', 'module', 'import', 'export',
-      'union', 'difference', 'intersection', 'translate', 'rotate', 'scale', 'color'
+      'let', 'return', 'function',
+      // 'union', 'difference', 'intersection', 'translate', 'rotate', 'scale', 'color'
     ],
     // Recognize constructors / primitive names (capitalized)
-    primitives: ['Sphere', 'Cube', 'Cylinder'],
+    primitives: ['Sphere', 'Cube', 'Cylinder', 'Rectangle'],
     tokenizer: {
       root: [
         // Constructors / primitive types (capitalized identifiers)
@@ -72,29 +72,26 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
 
   monaco.languages.setLanguageConfiguration('csgl', {
     comments: { lineComment: '//', blockComment: ['/*', '*/'] },
-    brackets: [['{', '}'], ['[', ']'], ['(', ')']],
+    brackets: [['{', '}'], ['(', ')']],
     autoClosingPairs: [
       { open: '{', close: '}' },
-      { open: '[', close: ']' },
       { open: '(', close: ')' },
     ],
     surroundingPairs: [
       { open: '{', close: '}' },
-      { open: '[', close: ']' },
       { open: '(', close: ')' }
     ],
-    // Note: strings are not a primary DSL feature — removed quote pairs
   });
 
   monaco.editor.defineTheme('csglTheme', {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: 'keyword', foreground: 'C586C0', fontStyle: 'bold' },
-      { token: 'number', foreground: 'B5CEA8' },
-      { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
-      { token: 'identifier', foreground: '9CDCFE' },
-      { token: 'type', foreground: '4EC9B0' }
+      { token: 'keyword', foreground: '#af0e49', fontStyle: 'bold' },
+      { token: 'number', foreground: '#d232a7' },
+      { token: 'comment', foreground: '#d991bb', fontStyle: 'italic' },
+      { token: 'identifier', foreground: '#9a51cd' },
+      { token: 'type', foreground: '#6f26c3' }
     ],
     colors: {
       'editor.foreground': '#FFFFFF',

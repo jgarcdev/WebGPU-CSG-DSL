@@ -1,0 +1,32 @@
+Program         = { Statement } EOF ;
+
+Statement       = LetStatement
+                | RenderStatement
+                | ExpressionStatement ;
+
+LetStatement    = "let" Identifier "=" Expression ;
+
+RenderStatement = "Render" "(" Expression ")" ;
+
+ExpressionStatement = Expression ;
+
+Expression      = CallExpression
+                | Identifier ;
+
+CallExpression  = Identifier "(" Arguments? ")" ;
+
+Arguments       = Expression { "," Expression } ;
+
+Identifier      = CapitalizedIdentifier
+                | LowercaseIdentifier ;
+
+CapitalizedIdentifier = UppercaseLetter { Letter | Digit } ;
+LowercaseIdentifier   = LowercaseLetter { Letter | Digit } ;
+
+Number          = ["+" | "-"] ( Digit { Digit } [ "." Digit { Digit } ]
+                  | "." Digit { Digit } ) ;
+
+Letter          = UppercaseLetter | LowercaseLetter ;
+UppercaseLetter = "A"…"Z" ;
+LowercaseLetter = "a"…"z" ;
+Digit           = "0"…"9" ;
