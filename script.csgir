@@ -1,0 +1,19 @@
+[0.0.1] // CSGIR version
+[
+	Renders[c.0]
+	Primitives[ // Lists are created primitives
+		Sphere[1.2]
+		Cube[2.0]
+		Cylinder[0.5, 3.0]
+	]
+	Transformations[ // Lists are applied transformations
+		p.0[/* translate of 1.0,0.0,0.0 matrix */]
+		p.1[/* rotate of 0.0,45.0,0.0 matrix */]
+		p.2[/* scale of 1.0,2.0,1.0 matrix */]
+		c.1[/* scale of 1.0,1.0,1.0 matrix */]
+	]
+	CSG[ // Lists are applied operations
+		Difference[t.0, t.2]
+		Union[c.0, t.1]
+	]
+]

@@ -77,7 +77,92 @@ let complexObject = union(
 
 - `color(obj, r, g, b) -> ColoredObject`
 
+## CSG-IR
 
+The top-level of an IR contains an optional `[version]`.
+It then must include the "program" itself, enclosed in `[]`.
+
+There are four types of statements/entries:
+- `Renders[]`
+- `Primitives[]`
+- `Transformations[]`
+- `CSG[]`
+
+Each of these sections contain a list of objects, referred as 
+- `p.x` for the `x`-th entry in `Primitives`
+- `t.x` for the `x`-th entry in `Transformations`
+- `c.x` for the `x`-th entry in `CSG`
+
+Each entry in `Renders` is an index to an object defined in `Primitives`, `Transformations`, or `CSG`. These objects are the ones to be rendered in the final output.
+
+Each entry in `Primitives` represents a created primitive object.
+The entry includes the type of primitive (sphere, cube, cylinder) and its parameters in the form of `Type[...params]`. For example, `Sphere[1.2]` represents a sphere with radius 1.2. There can be multiple entries of the same type and 
+multiple entries of the same type and parameters. In other words, 
+each entry is unique.
+
+Each entry in `Transformations` represents a transformation applied to an object.
+The entry includes a reference to the parent object (via the aforementioned references) and its corresponding matrix. For example, `p.0[...]` may represent
+some transformation (say a translation of (1, 0, 0)) applied to the primitive object `p.0` (the 0th entry in `Primitives`). Similar to `Primitives`, there can be multiple entries that refer to the same parent object and have the same transformation. Each entry is unique and creates a new object.
+
+Each entry in `CSG` represents a CSG operation applied to objects.
+The entry includes the type of operation (union, difference, intersection) and references to the operand objects (via the aforementioned references).
+For example, `Union[p.0, t.0]` represents a union operation between the primitive object `p.0` and the transformation object `t.0`. Similar to `Primitives` and `Transformations`, there can be multiple entries that refer to the same operand objects and have the same operation. Each entry is unique and creates a new object.
+
+
+Given the following code:
+```
+let sphere = Sphere(1.2);
+let cube = Cube(2.0);
+let cylinder = Cylinder(0.5, 3.0);
+
+let movedSphere = translate(sphere, 1.0, 0.0, 0.0);
+let rotatedCube = rotate(cube, 0.0, 45.0, 0.0);
+let stretchedCylinder = scale(cylinder, 1.0, 2.0, 1.0);
+
+let hole = difference(movedSphere, stretchedCylinder);
+let body = union(hole, rotatedCube);
+
+let finalObject = scale(body, 1, 1, 1);
+
+Render(finalObject);
+```
+The corresponding CSG-IR may look like:
+```
+[
+	Renders[c.0]
+	Primitives[
+		Sphere[1.2]
+		Cube[2.0]
+		Cylinder[0.5, 3.0]
+	]
+	Transformations[
+		p.0[1.0, 0.0, 0.0, 1.0,
+				0.0, 1.0, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.0, 0.0, 0.0, 1.0
+		]
+		p.1[0.707, 0.0, 0.707, 0.0,
+				0.0, 1.0, 0.0, 0.0,
+				-0.707, 0.0, 0.707, 0.0,
+				0.0, 0.0, 0.0, 1.0
+		]
+		p.2[1.0, 0.0, 0.0, 0.0,
+				0.0, 2.0, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.0, 0.0, 0.0, 1.0
+		]
+		c.1[1.0, 0.0, 0.0, 0.0,
+				0.0, 1.0, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.0, 0.0, 0.0, 1.0
+		]
+	]
+	CSG[
+		Difference[t.0, t.2]
+		Union[c.0, t.1]
+	]
+]
+```
 
 
 
