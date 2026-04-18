@@ -7,8 +7,10 @@ import compile from "../compiler/compiler.ts";
 const editorHost = document.getElementById('editor-host') as HTMLDivElement;
 const btnCompile = document.getElementById('btn-compile') as HTMLButtonElement;
 const btnRun = document.getElementById('btn-run') as HTMLButtonElement;
+const btnClear = document.getElementById('btn-clear') as HTMLButtonElement | null;
 const status = document.getElementById('status') as HTMLSpanElement;
 const log = document.getElementById('log') as HTMLDivElement;
+const logEntries = document.getElementById('log-entries') as HTMLDivElement | null;
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
 const chkAxes = document.getElementById('chk-axes') as HTMLInputElement | null;
 let ctx: CanvasRenderingContext2D | null = null;
@@ -24,8 +26,36 @@ let runtimeController: any = null;
 function appendLog(...parts: unknown[]) {
   const p = document.createElement('div');
   p.textContent = parts.map((v) => String(v)).join(' ');
-  log.appendChild(p);
-  log.scrollTop = log.scrollHeight;
+  const target = logEntries ?? log;
+  target.appendChild(p);
+  // keep the scroll anchored to the bottom of the entries container
+  if (logEntries) logEntries.scrollTop = logEntries.scrollHeight;
+  else log.scrollTop = log.scrollHeight;
+}
+
+if (btnClear) {
+  btnClear.addEventListener('click', () => {
+    try {
+      // Clear only the entries so the clear button remains in place
+      if (logEntries) logEntries.innerHTML = '';
+      else if (log) {
+        // If no separated container exists, remove all children except the clear button
+        for (let i = log.children.length - 1; i >= 0; i--) {
+          const child = log.children[i];
+          if (child.id !== 'btn-clear') log.removeChild(child);
+        }
+      }
+
+      // Try to clear 2D rendering on the canvas
+      const ctx2 = canvas.getContext('2d');
+      if (ctx2) ctx2.clearRect(0, 0, canvas.width, canvas.height);
+      else canvas.width = canvas.width;
+
+      if (status) status.textContent = '';
+    } catch (e) {
+      appendLog('Failed to clear output pane', String(e));
+    }
+  });
 }
 
 function getSource() {
