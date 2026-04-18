@@ -50,14 +50,24 @@ fn sdfSphere(p: vec3f, radius: f32) -> f32 {
 }
 
 fn sdfCube(p: vec3f, size: f32) -> f32 {
-  let b = vec3f(size * 0.5);
-  let q = abs(p) - b;
-  return length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+  let d = abs(p) - vec3f(size * 0.5);
+
+  let insideDist = min(max(d.x, max(d.y, d.z)), 0.0);
+  let outsideDist = length(max(d, vec3f(0.0)));
+
+  return outsideDist + insideDist;
 }
 
 fn sdfCylinder(p: vec3f, radius: f32, height: f32) -> f32 {
-  let d = vec2f(length(p.xz) - radius, abs(p.y) - (height * 0.5));
-  return min(max(d.x, d.y), 0.0) + length(max(d, vec2f(0.0)));
+  let inOutRadius = length(p.xz) - radius;
+  let inOutHeight = abs(p.y) - (height * 0.5);
+
+  let d = vec2f(inOutRadius, inOutHeight);
+
+  let insideDist = min(max(d.x, d.y), 0.0);
+  let outsideDist = length(max(d, vec2f(0.0)));
+
+  return insideDist + outsideDist;
 }
 
 

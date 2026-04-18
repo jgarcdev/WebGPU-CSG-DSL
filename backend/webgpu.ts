@@ -1,6 +1,11 @@
 import { parseIR, flattenIR, FlatLeaf, FlatToken } from "./csgir.ts";
 
 
+/**
+ * Loads a shader source file as text.
+ * @param path Path to the shader source
+ * @returns 
+ */
 async function loadShaderSource(path: string): Promise<string> {
   const res = await fetch(path);
   if (!res.ok) {

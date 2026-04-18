@@ -104,17 +104,14 @@ function parseBlock(input: string, openIndex: number): { content: string; nextIn
 function parseNumberList(raw: string): number[] {
 	const text = raw.trim();
 	if (text.length === 0) return [];
-	return text
-		.split(",")
-		.map((part) => part.trim())
-		.map((part) => {
-			if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(part)) {
-				fail(`invalid numeric literal '${part}'`);
-			}
-			const n = Number(part);
-			if (!Number.isFinite(n)) fail(`non-finite numeric literal '${part}'`);
-			return n;
-		});
+	return text.split(",").map((part) => part.trim()).map((part) => {
+		if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(part)) {
+			fail(`invalid numeric literal '${part}'`);
+		}
+		const n = Number(part);
+		if (!Number.isFinite(n)) fail(`non-finite numeric literal '${part}'`);
+		return n;
+	});
 }
 
 function parseRef(raw: string): ObjectRef {
@@ -160,11 +157,7 @@ function parseEntryBlocks(sectionContent: string): Array<{ head: string; payload
 function parseRenders(sectionContent: string): ObjectRef[] {
 	const trimmed = sectionContent.trim();
 	if (!trimmed) return [];
-	return trimmed
-		.split(",")
-		.map((part) => part.trim())
-		.filter((part) => part.length > 0)
-		.map(parseRef);
+	return trimmed.split(",").map((part) => part.trim()).filter((part) => part.length > 0).map(parseRef);
 }
 
 function validateReference(ref: ObjectRef, ir: Pick<ParsedIR, "primitives" | "transformations" | "csg">): void {
@@ -179,10 +172,7 @@ function validateReference(ref: ObjectRef, ir: Pick<ParsedIR, "primitives" | "tr
 	}
 }
 
-function parseRequiredSection(programBody: string, sectionName: string, cursor: number): {
-	content: string;
-	nextCursor: number;
-} {
+function parseRequiredSection(programBody: string, sectionName: string, cursor: number): { content: string; nextCursor: number;} {
 	const start = programBody.indexOf(sectionName, cursor);
 	if (start === -1) fail(`missing required section '${sectionName}'`);
 
@@ -196,6 +186,7 @@ function parseRequiredSection(programBody: string, sectionName: string, cursor: 
 	if (programBody[open] !== "[") fail(`section '${sectionName}' must be followed by '['`);
 
 	const block = parseBlock(programBody, open);
+
 	return {
 		content: block.content,
 		nextCursor: block.nextIndex,
@@ -265,6 +256,7 @@ export function parseIR(irCode: string): ParsedIR {
 		if (matrix.length !== 16) {
 			fail(`transformation '${entry.head}' must contain exactly 16 matrix values`);
 		}
+
 		return { source, matrix };
 	});
 
@@ -273,14 +265,11 @@ export function parseIR(irCode: string): ParsedIR {
 		if (!VALID_CSG_OPS.has(entry.head)) {
 			fail(`unsupported CSG op '${entry.head}'`);
 		}
-		const refs = entry.payload
-			.split(",")
-			.map((part) => part.trim())
-			.filter((part) => part.length > 0)
-			.map(parseRef);
+		const refs = entry.payload.split(",").map((part) => part.trim()).filter((part) => part.length > 0).map(parseRef);
 		if (refs.length !== 2) {
 			fail(`CSG op '${entry.head}' must contain exactly 2 object references`);
 		}
+
 		return {
 			op: entry.head as CSGOpKind,
 			left: refs[0],
@@ -308,14 +297,19 @@ export function parseIR(irCode: string): ParsedIR {
 
 
 
-
-
 function refToGlobalIndex(ref: ObjectRef, ir: ParsedIR): number {
 	if (ref.kind === "p") return ref.index;
 	if (ref.kind === "t") return ir.primitives.length + ref.index;
 	return ir.primitives.length + ir.transformations.length + ref.index;
 }
 
+/**
+ * Flattens parsed IR into a form suitable for rendering: a list of primitive leaves with world-space inverse matrices, 
+ * and a single RPN token stream encoding the CSG tree.
+ * @param ir Parsed IR to flatten into renderable form
+ * @returns An object containing the list of flattened leaves, the RPN token stream, and an estimate of the scene radius for camera framing
+ * @throws If the IR contains cycles, references out of range, or other structural issues that prevent flattening
+ */
 export function flattenIR(ir: ParsedIR): { leaves: FlatLeaf[]; tokens: FlatToken[]; sceneRadius: number } {
 	const leaves: FlatLeaf[] = [];
 	const tokens: FlatToken[] = [];
@@ -373,6 +367,7 @@ export function flattenIR(ir: ParsedIR): { leaves: FlatLeaf[]; tokens: FlatToken
 		}
 
 		if (ref.kind === "t") {
+			// Get the transformation type and apply the necessary matrix operation
 			const tr = ir.transformations[ref.index];
 			const invThis = invertAffine(tr.matrix);
 			const nextInv = mulMat4(invThis, currentInv);
