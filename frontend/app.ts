@@ -124,7 +124,17 @@ btnRun.addEventListener('click', async () => {
     });
     const ir = irCode ? irCode : defaultIR;
     const showAxes = (document.getElementById('chk-axes') as HTMLInputElement)?.checked ?? false;
-    await webgpuMain(canvas, ir, (msg) => appendLog(msg), { showAxes });
+    const controller = await webgpuMain(canvas, ir, (msg) => appendLog(msg), { showAxes });
+    runtimeController = controller;
+    // initialize frontend camera state from renderer
+    try {
+      const cam = controller.getCamera?.();
+      if (cam) {
+        initCameraFromRenderer(cam.pos, cam.target, cam.focal);
+      }
+    } catch (e) {
+      appendLog('Failed to get initial camera from renderer', String(e));
+    }
   } catch (err) {
     status.textContent = 'WebGPU error';
     appendLog('WebGPU failed', String(err));
@@ -176,6 +186,143 @@ function waitForRequire(timeout = 3000) {
     check();
   });
 }
+
+// --- Camera / interaction controller (lightweight, CPU-side) ---
+let camPos = { x: 0, y: 0, z: 5 };
+let camTarget = { x: 0, y: 0, z: 0 };
+let camFocal = 1.8;
+let camYaw = 0;
+let camPitch = 0;
+let camDistance = 5;
+
+function initCameraFromRenderer(posArr: [number, number, number], targetArr: [number, number, number], focal: number) {
+  camPos.x = posArr[0]; camPos.y = posArr[1]; camPos.z = posArr[2];
+  camTarget.x = targetArr[0]; camTarget.y = targetArr[1]; camTarget.z = targetArr[2];
+  camFocal = focal;
+  const vx = camPos.x - camTarget.x;
+  const vy = camPos.y - camTarget.y;
+  const vz = camPos.z - camTarget.z;
+  camDistance = Math.max(1e-3, Math.hypot(vx, vy, vz));
+  camYaw = Math.atan2(vx, vz);
+  camPitch = Math.asin(Math.max(-1, Math.min(1, vy / camDistance)));
+}
+
+let cameraScheduled = false;
+function scheduleCameraUpdate() {
+  if (cameraScheduled) return;
+  cameraScheduled = true;
+  requestAnimationFrame(() => {
+    cameraScheduled = false;
+    const tx = camTarget.x;
+    const ty = camTarget.y;
+    const tz = camTarget.z;
+    const x = tx + camDistance * Math.sin(camYaw) * Math.cos(camPitch);
+    const y = ty + camDistance * Math.sin(camPitch);
+    const z = tz + camDistance * Math.cos(camYaw) * Math.cos(camPitch);
+    camPos.x = x; camPos.y = y; camPos.z = z;
+    if (runtimeController && typeof runtimeController.setCamera === 'function') {
+      runtimeController.setCamera([camPos.x, camPos.y, camPos.z], [camTarget.x, camTarget.y, camTarget.z], camFocal);
+    }
+  });
+}
+
+function updateCameraToRenderer() {
+  // schedule a batched update to avoid excessive GPU submissions during pointermove
+  scheduleCameraUpdate();
+}
+
+// pointer interaction
+let dragging = false;
+let dragButton: number | null = null;
+let lastX = 0;
+let lastY = 0;
+let pointerId: number | null = null;
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  dragging = true;
+  dragButton = e.button;
+  pointerId = e.pointerId;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  if (e.button === 0) {
+    // left: compute pivot candidate and softly move target toward it
+    if (runtimeController && typeof runtimeController.getCamera === 'function') {
+      try {
+        const cam = runtimeController.getCamera();
+        const ndcX = (e.offsetX / canvas.width) * 2 - 1;
+        const ndcY = 1 - (e.offsetY / canvas.height) * 2;
+        // compute ray dir in world using same logic as shader
+        const forward = normalizeVec3([cam.target[0] - cam.pos[0], cam.target[1] - cam.pos[1], cam.target[2] - cam.pos[2]]);
+        let upRef = [0,1,0];
+        if (Math.abs(dot(forward, upRef)) > 0.999) upRef = [0,0,1];
+        const right = normalizeVec3(cross(forward, upRef));
+        const up = normalizeVec3(cross(right, forward));
+        const aspect = canvas.width / Math.max(canvas.height, 1);
+        const sx = ndcX * aspect;
+        const sy = ndcY;
+        const dir = normalizeVec3([
+          right[0]*sx + up[0]*sy + forward[0]*cam.focal,
+          right[1]*sx + up[1]*sy + forward[1]*cam.focal,
+          right[2]*sx + up[2]*sy + forward[2]*cam.focal,
+        ]);
+        // pick a point half the current distance along the ray
+        const dist = camDistance * 0.5;
+        const candidate = [cam.pos[0] + dir[0]*dist, cam.pos[1] + dir[1]*dist, cam.pos[2] + dir[2]*dist];
+        // lerp
+        camTarget.x = camTarget.x * 0.85 + candidate[0] * 0.15;
+        camTarget.y = camTarget.y * 0.85 + candidate[1] * 0.15;
+        camTarget.z = camTarget.z * 0.85 + candidate[2] * 0.15;
+        updateCameraToRenderer();
+      } catch (_) {}
+    }
+  }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!dragging || e.pointerId !== pointerId) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  if (dragButton === 0) {
+    // left drag: orbit
+    camYaw += dx * 0.005;
+    camPitch += -dy * 0.005;
+    const limit = Math.PI * 0.49;
+    camPitch = Math.max(-limit, Math.min(limit, camPitch));
+    updateCameraToRenderer();
+  } else if (dragButton === 2) {
+    // right drag: zoom
+    const k = 1.0 + dy * 0.01;
+    camDistance = Math.max(0.1, camDistance * k);
+    updateCameraToRenderer();
+  }
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  if (e.pointerId === pointerId) {
+    dragging = false;
+    dragButton = null;
+    pointerId = null;
+  }
+});
+
+canvas.addEventListener('pointercancel', (e) => {
+  if (e.pointerId === pointerId) {
+    dragging = false;
+    dragButton = null;
+    pointerId = null;
+  }
+});
+
+// small math helpers
+function dot(a: number[], b: number[]) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+function cross(a: number[], b: number[]) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function lengthVec3(a: number[]) { return Math.hypot(a[0], a[1], a[2]); }
+function normalizeVec3(a: number[]) { const l = Math.max(1e-6, lengthVec3(a)); return [a[0]/l, a[1]/l, a[2]/l]; }
 
 async function initMonacoEditor() {
   try {

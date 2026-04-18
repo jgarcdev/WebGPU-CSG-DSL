@@ -1,11 +1,13 @@
 struct SceneUniforms {
   resolution: vec2f,
+  _pad0: vec2f,
   leafCount: u32,
   tokenCount: u32,
   renderCount: u32,
   showAxes: u32,
-  _pad0: u32,
-  _pad1: u32,
+  cameraPos: vec4f,
+  cameraTarget: vec4f,
+  cameraParams: vec4f,
 };
 
 struct LeafNode {
@@ -92,7 +94,7 @@ fn sdfLeaf(idx: u32, p: vec3f) -> f32 {
 }
 
 fn sdfScene(p: vec3f) -> f32 {
-  var stack: array<f32, 256>;
+  var stack: array<f32, 128>;
   var sp: u32 = 0u;
 
   for (var i: u32 = 0u; i < scene.tokenCount; i = i + 1u) {
@@ -203,14 +205,28 @@ fn axisOverlayRay(ro: vec3f, dir: vec3f) -> vec4f {
 fn main(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   let uv = (fragPos.xy / scene.resolution) * 2.0 - vec2f(1.0, 1.0);
   let aspect = scene.resolution.x / max(scene.resolution.y, 1.0);
-  let dir = normalize(vec3f(uv.x * aspect, -uv.y, -1.8));
 
-  let ro = vec3f(0.0, 0.0, 5.0);
+  let ro = scene.cameraPos.xyz;
+  let camTarget = scene.cameraTarget.xyz;
+  let focal = scene.cameraParams.x;
+
+  var forward = normalize(camTarget - ro);
+  var upRef = vec3f(0.0, 1.0, 0.0);
+  if (abs(dot(forward, upRef)) > 0.999) {
+    upRef = vec3f(0.0, 0.0, 1.0);
+  }
+  let right = normalize(cross(forward, upRef));
+  let up = normalize(cross(right, forward));
+
+  // screen coordinates: uv.x left-right, uv.y up-down
+  let sx = uv.x * aspect;
+  let sy = -uv.y;
+  let dir = normalize(right * sx + up * sy + forward * focal);
   var t = 0.0;
   var hit = false;
   var p = ro;
 
-  for (var i = 0; i < 128; i = i + 1) {
+  for (var i = 0; i < 64; i = i + 1) {
     p = ro + dir * t;
     let d = sdfScene(p);
     if (d < 0.001) {
@@ -218,7 +234,7 @@ fn main(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
       break;
     }
     t = t + d;
-    if (t > 80.0) {
+    if (t > 60.0) {
       break;
     }
   }

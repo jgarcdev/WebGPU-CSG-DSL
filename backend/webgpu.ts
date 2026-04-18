@@ -54,16 +54,37 @@ function createTokenBufferData(tokens: FlatToken[]): ArrayBuffer {
   return buffer;
 }
 
-function createUniformBufferData(width: number, height: number, leafCount: number, tokenCount: number, renderCount: number, showAxes: number): ArrayBuffer {
-  // Layout: vec2f (8) + 3*u32 (12) + showAxes u32 (4) = 24 bytes, pad to 48
-  const buffer = new ArrayBuffer(48);
+function createUniformBufferData(width: number, height: number, leafCount: number, tokenCount: number, renderCount: number, showAxes: number, cameraPos: [number, number, number], cameraTarget: [number, number, number], focal: number): ArrayBuffer {
+  // Layout (16-byte aligned rows):
+  // [0..15] resolution.xy, pad.xy
+  // [16..31] leafCount, tokenCount, renderCount, showAxes (u32)
+  // [32..47] cameraPos vec4f
+  // [48..63] cameraTarget vec4f
+  // [64..79] cameraParams vec4f (x=focal)
+  const buffer = new ArrayBuffer(80);
   const view = new DataView(buffer);
   view.setFloat32(0, width, true);
   view.setFloat32(4, height, true);
-  view.setUint32(8, leafCount, true);
-  view.setUint32(12, tokenCount, true);
-  view.setUint32(16, renderCount, true);
-  view.setUint32(20, showAxes ? 1 : 0, true);
+  // bytes 8..15 left as padding
+  view.setUint32(16, leafCount, true);
+  view.setUint32(20, tokenCount, true);
+  view.setUint32(24, renderCount, true);
+  view.setUint32(28, showAxes ? 1 : 0, true);
+  // cameraPos at offset 32
+  view.setFloat32(32, cameraPos[0], true);
+  view.setFloat32(36, cameraPos[1], true);
+  view.setFloat32(40, cameraPos[2], true);
+  view.setFloat32(44, 0.0, true);
+  // cameraTarget at offset 48
+  view.setFloat32(48, cameraTarget[0], true);
+  view.setFloat32(52, cameraTarget[1], true);
+  view.setFloat32(56, cameraTarget[2], true);
+  view.setFloat32(60, 0.0, true);
+  // cameraParams at offset 64
+  view.setFloat32(64, focal, true);
+  view.setFloat32(68, 0.0, true);
+  view.setFloat32(72, 0.0, true);
+  view.setFloat32(76, 0.0, true);
   return buffer;
 }
 
@@ -115,7 +136,13 @@ export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLo
   const leafRaw = createLeafBufferData(flattened.leaves);
   const tokenRaw = createTokenBufferData(flattened.tokens);
   const showAxes = options?.showAxes ? 1 : 0;
-  const uniformRaw = createUniformBufferData(width, height, flattened.leaves.length, flattened.tokens.length, ir.renders.length, showAxes);
+  // initial camera: position the camera along +Z looking at origin, distance based on sceneRadius
+  const sceneRadius = (flattened as any).sceneRadius ?? 5.0;
+  const initDistance = Math.max(1.0, sceneRadius * 1.6);
+  const cameraPosInit: [number, number, number] = [0.0, 0.0, initDistance];
+  const cameraTargetInit: [number, number, number] = [0.0, 0.0, 0.0];
+  const focalInit = 1.8;
+  const uniformRaw = createUniformBufferData(width, height, flattened.leaves.length, flattened.tokens.length, ir.renders.length, showAxes, cameraPosInit, cameraTargetInit, focalInit);
 
   const leafBuffer = device.createBuffer({
     size: leafRaw.byteLength,
@@ -163,22 +190,48 @@ export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLo
     ],
   });
 
-  const encoder = device.createCommandEncoder();
-  const view = context!.getCurrentTexture()!.createView();
-  const pass = encoder.beginRenderPass({
-    colorAttachments: [
-      {
-        view,
-        clearValue: { r: 0.04, g: 0.06, b: 0.1, a: 1 },
-        loadOp: "clear",
-        storeOp: "store",
-      },
-    ],
-  });
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
-  pass.draw(3, 1, 0, 0);
-  pass.end();
-  device.queue.submit([encoder.finish()]);
-  onLog?.("WebGPU render completed");
+  function renderOnce() {
+    const encoder = device.createCommandEncoder();
+    const view = context!.getCurrentTexture()!.createView();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view,
+          clearValue: { r: 0.04, g: 0.06, b: 0.1, a: 1 },
+          loadOp: "clear",
+          storeOp: "store",
+        },
+      ],
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+    onLog?.("WebGPU render completed");
+  }
+
+  renderOnce();
+
+  // Controller for live updates without recreating pipeline/buffers
+  return {
+    setShowAxes(show: boolean) {
+      const v = new Uint32Array([show ? 1 : 0]);
+      // showAxes is at byte offset 28
+      device.queue.writeBuffer(uniformBuffer, 28, v.buffer, 0, 4);
+      renderOnce();
+    },
+    setCamera(pos: [number, number, number], target: [number, number, number], focal: number) {
+      const cam = new Float32Array([pos[0], pos[1], pos[2], 0.0]);
+      const tgt = new Float32Array([target[0], target[1], target[2], 0.0]);
+      const params = new Float32Array([focal, 0.0, 0.0, 0.0]);
+      device.queue.writeBuffer(uniformBuffer, 32, cam.buffer, cam.byteOffset, 16);
+      device.queue.writeBuffer(uniformBuffer, 48, tgt.buffer, tgt.byteOffset, 16);
+      device.queue.writeBuffer(uniformBuffer, 64, params.buffer, params.byteOffset, 16);
+      renderOnce();
+    }
+    , getCamera() {
+      return { pos: cameraPosInit, target: cameraTargetInit, focal: focalInit };
+    }
+  };
 }
