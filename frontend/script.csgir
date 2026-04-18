@@ -1,0 +1,20 @@
+[0.0.1] [
+	Renders[c.3] 
+	Primitives[
+		Cube[1]
+		Sphere[0.65]
+		Cylinder[0.35, 1.01]
+		Cylinder[0.35, 1.01]
+		Cylinder[0.35, 1.01]
+	]
+	Transformations[ 
+		p.3[0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+		p.4[1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]
+	]
+	CSG[
+		Intersection[p.0, p.1]
+		Union[p.2, t.0]
+		Union[c.1, t.1]
+		Difference[c.0, c.2]
+	]
+]

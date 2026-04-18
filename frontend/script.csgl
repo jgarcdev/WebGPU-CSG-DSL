@@ -1,0 +1,17 @@
+// Sample CSG script demonstrating primitives, transforms, and operations
+
+let cube = Cube(1);
+let sphere = Sphere(0.65);
+let cs = intersection(cube, sphere);
+
+
+let c0 = Cylinder(0.35, 1.01);
+let c1 = rotate(Cylinder(0.35, 1.01), 0, 0, 90);
+let c0c1 = union(c0, c1);
+
+let c2 = rotate(Cylinder(0.35, 1.01), 90, 0, 0);
+let c = union(c0c1, c2);
+
+
+let shape = difference(cs, c);
+Render(shape);

@@ -3,7 +3,6 @@
 import { setupCSGLLanguage, MonacoLike } from './monaco/csgl.ts';
 import { webgpuMain } from '../backend/webgpu.ts';
 import compile from "../compiler/compiler.ts";
-import { Warnings } from "../compiler/warnings.ts";
 
 const editorHost = document.getElementById('editor-host') as HTMLDivElement;
 const btnCompile = document.getElementById('btn-compile') as HTMLButtonElement;
@@ -11,6 +10,7 @@ const btnRun = document.getElementById('btn-run') as HTMLButtonElement;
 const status = document.getElementById('status') as HTMLSpanElement;
 const log = document.getElementById('log') as HTMLDivElement;
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
+const chkAxes = document.getElementById('chk-axes') as HTMLInputElement | null;
 let ctx: CanvasRenderingContext2D | null = null;
 type EditorInstance = any;
 
@@ -19,6 +19,7 @@ let monacoNs: any = null; // hold the global `monaco` namespace
 let monacoEditorInstance: any = null; // full editor instance
 let currentDecorationIds: string[] = [];
 let irCode: string | null = null;
+let runtimeController: any = null;
 
 function appendLog(...parts: unknown[]) {
   const p = document.createElement('div');
@@ -84,7 +85,7 @@ btnCompile.addEventListener('click', async () => {
 });
 
 btnRun.addEventListener('click', async () => {
-  status.textContent = 'Running (WebGPU preview)';
+  status.textContent = 'Running';
   try {
     // Default IR is read from default.csgir
     const defaultIR = await fetch('/default.csgir').then((resp) => {
@@ -92,8 +93,8 @@ btnRun.addEventListener('click', async () => {
       return resp.text();
     });
     const ir = irCode ? irCode : defaultIR;
-    await webgpuMain(canvas, ir, (msg) => appendLog(msg));
-    appendLog('WebGPU placeholder ran');
+    const showAxes = (document.getElementById('chk-axes') as HTMLInputElement)?.checked ?? false;
+    await webgpuMain(canvas, ir, (msg) => appendLog(msg), { showAxes });
   } catch (err) {
     status.textContent = 'WebGPU error';
     appendLog('WebGPU failed', String(err));
@@ -119,6 +120,20 @@ btnRun.addEventListener('click', async () => {
     ctx2.putImageData(image, 0, 0);
   }
 });
+
+// // live checkbox handler: update renderer without re-running
+// if (chkAxes) {
+//   chkAxes.addEventListener('change', () => {
+//     const val = chkAxes.checked;
+//     try {
+//       if (runtimeController && typeof runtimeController.setShowAxes === 'function') {
+//         runtimeController.setShowAxes(val);
+//       }
+//     } catch (e) {
+//       appendLog('Failed to update showAxes at runtime', String(e));
+//     }
+//   });
+// }
 
 function waitForRequire(timeout = 3000) {
   return new Promise<void>((resolve, reject) => {
@@ -173,7 +188,7 @@ async function initMonacoEditor() {
       }) as unknown as EditorInstance;
       // keep references for later decorations/markers
       monacoNs = monaco;
-      monacoEditorInstance = monacoEditor as any;
+      monacoEditorInstance = monacoEditor;
 
       appendLog('Monaco ready (CSGL)');
     });

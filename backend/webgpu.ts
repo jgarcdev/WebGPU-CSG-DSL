@@ -1,158 +1,179 @@
-// import computeWGSL from "./shaders/compute.wgsl";
-// import vertWGSL from "./shaders/vert.wgsl";
-// import fragWGSL from "./shaders/frag.wgsl";
+import { parseIR, flattenIR, FlatLeaf, FlatToken } from "./csgir.ts";
 
 
+async function loadShaderSource(path: string): Promise<string> {
+  const res = await fetch(path);
+  if (!res.ok) {
+    throw new Error(`Failed to load shader ${path}: ${res.status} ${res.statusText}`);
+  }
+  return await res.text();
+}
 
-export async function webgpuMain(canvas: HTMLCanvasElement, onLog?: (msg: string) => void) {
-  onLog?.('Initializing WebGPU');
+function createLeafBufferData(leaves: FlatLeaf[]): ArrayBuffer {
+  const stride = 96;
+  const buffer = new ArrayBuffer(stride * leaves.length);
+  const view = new DataView(buffer);
+
+  for (let i = 0; i < leaves.length; i++) {
+    const base = i * stride;
+    const leaf = leaves[i];
+    view.setUint32(base + 0, leaf.kind, true);
+    view.setUint32(base + 4, 0, true);
+    view.setUint32(base + 8, 0, true);
+    view.setUint32(base + 12, 0, true);
+    view.setFloat32(base + 16, leaf.params[0], true);
+    view.setFloat32(base + 20, leaf.params[1], true);
+    view.setFloat32(base + 24, leaf.params[2], true);
+    view.setFloat32(base + 28, leaf.params[3], true);
+    for (let j = 0; j < 16; j++) {
+      view.setFloat32(base + 32 + j * 4, leaf.inv[j], true);
+    }
+  }
+
+  return buffer;
+}
+
+function createTokenBufferData(tokens: FlatToken[]): ArrayBuffer {
+  const stride = 16;
+  const buffer = new ArrayBuffer(stride * tokens.length);
+  const view = new DataView(buffer);
+
+  for (let i = 0; i < tokens.length; i++) {
+    const base = i * stride;
+    view.setUint32(base + 0, tokens[i].kind, true);
+    view.setUint32(base + 4, tokens[i].data, true);
+    view.setUint32(base + 8, 0, true);
+    view.setUint32(base + 12, 0, true);
+  }
+
+  return buffer;
+}
+
+function createUniformBufferData(width: number, height: number, leafCount: number, tokenCount: number, renderCount: number, showAxes: number): ArrayBuffer {
+  // Layout: vec2f (8) + 3*u32 (12) + showAxes u32 (4) = 24 bytes, pad to 48
+  const buffer = new ArrayBuffer(48);
+  const view = new DataView(buffer);
+  view.setFloat32(0, width, true);
+  view.setFloat32(4, height, true);
+  view.setUint32(8, leafCount, true);
+  view.setUint32(12, tokenCount, true);
+  view.setUint32(16, renderCount, true);
+  view.setUint32(20, showAxes ? 1 : 0, true);
+  return buffer;
+}
+
+export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLog?: (msg: string) => void, options?: { showAxes?: boolean }) {
+  onLog?.("Received IR code:\n" + irCode);
+
+  onLog?.("Initializing WebGPU");
   if (!navigator.gpu) {
-    onLog?.('WebGPU not supported in this browser');
-    throw new Error('WebGPU not supported');
+    onLog?.("WebGPU not supported in this browser");
+    throw new Error("WebGPU not supported");
   }
 
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) {
-    onLog?.('No suitable GPU adapter found');
-    throw new Error('No GPU adapter');
+    onLog?.("No suitable GPU adapter found");
+    throw new Error("No GPU adapter");
   }
 
   const device = await adapter.requestDevice();
-  const context = canvas.getContext('webgpu') as GPUCanvasContext | null;
+  const context = canvas.getContext("webgpu") as GPUCanvasContext | null;
   if (!context) {
-    onLog?.('Could not acquire WebGPU context from canvas');
-    throw new Error('No WebGPU context');
+    onLog?.("Could not acquire WebGPU context from canvas");
+    throw new Error("No WebGPU context");
   }
 
   const format = navigator.gpu.getPreferredCanvasFormat();
-	context.configure({
-		device,
-		format
-	});
-
-  const GRID_SIZE = 8;
-
-  // Create a buffer with the vertices for a single cell.
-  const vertices = new Float32Array([
-    -0.8, -0.8,
-      0.8, -0.8,
-      0.8,  0.8,
-
-    -0.8, -0.8,
-      0.8,  0.8,
-    -0.8,  0.8,
-  ]);
-  const vertexBuffer = device.createBuffer({
-    label: "Cell vertices",
-    size: vertices.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(vertexBuffer, 0, vertices);
-
-  const vertexBufferLayout: GPUVertexBufferLayout = {
-    arrayStride: 8,
-    attributes: [{
-      format: "float32x2",
-      offset: 0,
-      shaderLocation: 0, // Position. Matches @location(0) in the @vertex shader.
-    }],
-  };
-
-  // Create the shader that will render the cells.
-  const cellShaderModule = device.createShaderModule({
-    label: "Cell shader",
-    code: /* wgsl */ `
-      struct VertexOutput {
-        @builtin(position) position: vec4f,
-        @location(0) cell: vec2f,
-      };
-
-      @group(0) @binding(0) var<uniform> grid: vec2f;
-
-      @vertex
-      fn vertexMain(@location(0) position: vec2f,
-                    @builtin(instance_index) instance: u32) -> VertexOutput {
-        let i = f32(instance);
-        let cell = vec2f(i % grid.x, floor(i / grid.x));
-
-        let cellOffset = cell / grid * 2;
-        let gridPos = (position+1) / grid - 1 + cellOffset;
-
-        var output: VertexOutput;
-        output.position = vec4f(gridPos, 0, 1);
-        output.cell = cell;
-        return output;
-      }
-
-      @fragment
-      fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-        let c = input.cell / grid;
-        return vec4f(c, 1-c.x, 1);
-      }
-    `
+  const width = Math.max(1, Math.floor(canvas.clientWidth || canvas.width || 640));
+  const height = Math.max(1, Math.floor(canvas.clientHeight || canvas.height || 480));
+  canvas.width = width;
+  canvas.height = height;
+  context.configure({
+    device,
+    format,
+    alphaMode: "premultiplied",
   });
 
-  // Create a pipeline that renders the cell.
-  const cellPipeline = device.createRenderPipeline({
-    label: "Cell pipeline",
-    layout: "auto",
-    vertex: {
-      module: cellShaderModule,
-      entryPoint: "vertexMain",
-      buffers: [vertexBufferLayout]
-    },
-    fragment: {
-      module: cellShaderModule,
-      entryPoint: "fragmentMain",
-      targets: [{
-        format: format
-      }]
-    }
-  });
+  const ir = parseIR(irCode);
+  onLog?.(`Parsed IR v${ir.version ?? "unknown"}: ${ir.primitives.length} primitives, ${ir.transformations.length} transformations, ${ir.csg.length} csg ops, ${ir.renders.length} render target(s)`);
+  if (ir.renders.length === 0) {
+    throw new Error("IR parsed successfully but includes no render targets");
+  }
 
-  // Create a uniform buffer that describes the grid.
-  const uniformArray = new Float32Array([GRID_SIZE, GRID_SIZE]);
+  const flattened = flattenIR(ir);
+  if (flattened.leaves.length === 0 || flattened.tokens.length === 0) {
+    throw new Error("Could not flatten IR into a renderable scene");
+  }
+  // validateRPN(flattened.tokens);
+
+  const leafRaw = createLeafBufferData(flattened.leaves);
+  const tokenRaw = createTokenBufferData(flattened.tokens);
+  const showAxes = options?.showAxes ? 1 : 0;
+  const uniformRaw = createUniformBufferData(width, height, flattened.leaves.length, flattened.tokens.length, ir.renders.length, showAxes);
+
+  const leafBuffer = device.createBuffer({
+    size: leafRaw.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(leafBuffer, 0, leafRaw);
+
+  const tokenBuffer = device.createBuffer({
+    size: tokenRaw.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(tokenBuffer, 0, tokenRaw);
+
   const uniformBuffer = device.createBuffer({
-    label: "Grid Uniforms",
-    size: uniformArray.byteLength,
+    size: uniformRaw.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
+  device.queue.writeBuffer(uniformBuffer, 0, uniformRaw);
 
-  // Create a bind group to pass the grid uniforms into the pipeline
+  const vertWGSL = await loadShaderSource("/backend/shaders/vert.wgsl");
+  const fragWGSL = await loadShaderSource("/backend/shaders/frag.wgsl");
+
+  const pipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+      module: device.createShaderModule({ code: vertWGSL }),
+      entryPoint: "main",
+    },
+    fragment: {
+      module: device.createShaderModule({ code: fragWGSL }),
+      entryPoint: "main",
+      targets: [{ format }],
+    },
+    primitive: {
+      topology: "triangle-list",
+    },
+  });
+
   const bindGroup = device.createBindGroup({
-    label: "Cell renderer bind group",
-    layout: cellPipeline.getBindGroupLayout(0),
-    entries: [{
-      binding: 0,
-      resource: { buffer: uniformBuffer }
-    }],
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: { buffer: leafBuffer } },
+      { binding: 2, resource: { buffer: tokenBuffer } },
+    ],
   });
 
-  // Clear the canvas with a render pass
   const encoder = device.createCommandEncoder();
-
+  const view = context!.getCurrentTexture()!.createView();
   const pass = encoder.beginRenderPass({
-    colorAttachments: [{
-      view: context.getCurrentTexture().createView(),
-      loadOp: "clear",
-      clearValue: { r: 0, g: 0, b: 0.4, a: 1.0 },
-      storeOp: "store",
-    }]
+    colorAttachments: [
+      {
+        view,
+        clearValue: { r: 0.04, g: 0.06, b: 0.1, a: 1 },
+        loadOp: "clear",
+        storeOp: "store",
+      },
+    ],
   });
-
-  // Draw the square.
-  pass.setPipeline(cellPipeline);
+  pass.setPipeline(pipeline);
   pass.setBindGroup(0, bindGroup);
-  pass.setVertexBuffer(0, vertexBuffer);
-
-  // Draw enough cells to fill the grid
-  const instanceCount = GRID_SIZE * GRID_SIZE;
-  pass.draw(vertices.length / 2, instanceCount);
-
+  pass.draw(3, 1, 0, 0);
   pass.end();
-
   device.queue.submit([encoder.finish()]);
-
-  onLog?.('WebGPU frame submitted');
+  onLog?.("WebGPU render completed");
 }

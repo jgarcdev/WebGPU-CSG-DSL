@@ -25,7 +25,11 @@ async function serveFileUrl(fileUrl: URL, requestPath: string) {
 async function bundleAppTs() {
   const appUrl = new URL('./frontend/app.ts', import.meta.url).href;
   // Use Deno.bundle with `entrypoints` to create an in-memory bundle
-  const result = await Deno.bundle({ entrypoints: [appUrl], write: false });
+  const result = await Deno.bundle({ 
+    entrypoints: [appUrl],
+    write: false,
+    // sourcemap: "inline"
+  });
   // Prefer outputFiles when available (array of OutputFile)
   if (result && Array.isArray(result.outputFiles)) {
     const files: Array<Deno.bundle.OutputFile> = result.outputFiles;
@@ -51,15 +55,6 @@ Deno.serve({ port: 8080 }, async (req) => {
     return await serveFileUrl(new URL('./frontend/index.html', import.meta.url), '/index.html');
   }
 
-  if (pathname === '/compile' && req.method === 'POST') {
-    try {
-      await req.json();
-      return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } });
-    } catch (_e) {
-      return new Response(JSON.stringify({ ok: false, error: 'invalid json' }), { headers: { 'content-type': 'application/json' }, status: 400 });
-    }
-  }
-
   if (pathname === '/app.js') {
     try {
       const js = await bundleAppTs();
@@ -72,16 +67,16 @@ Deno.serve({ port: 8080 }, async (req) => {
   // Serve static frontend files from ./frontend, fall back to project root
   if (pathname.startsWith('/')) {
     try {
-      const fileUrl = new URL(`./frontend${pathname}`, import.meta.url);
-      const resp1 = await serveFileUrl(fileUrl, pathname);
-      if (resp1.status !== 404) return resp1;
+      const fileUrl2 = new URL(`.${pathname}`, import.meta.url);
+      const resp2 = await serveFileUrl(fileUrl2, pathname);
+      if (resp2.status !== 404) return resp2;
     } catch (_) {
       _;
     }
     try {
-      const fileUrl2 = new URL(`.${pathname}`, import.meta.url);
-      const resp2 = await serveFileUrl(fileUrl2, pathname);
-      if (resp2.status !== 404) return resp2;
+      const fileUrl = new URL(`./frontend${pathname}`, import.meta.url);
+      const resp1 = await serveFileUrl(fileUrl, pathname);
+      if (resp1.status !== 404) return resp1;
     } catch (_) {
       _;
     }
