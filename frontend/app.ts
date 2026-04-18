@@ -12,7 +12,27 @@ const status = document.getElementById('status') as HTMLSpanElement;
 const log = document.getElementById('log') as HTMLDivElement;
 const logEntries = document.getElementById('log-entries') as HTMLDivElement | null;
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
+const gizmoCanvas = document.getElementById('gizmo') as HTMLCanvasElement | null;
 const chkAxes = document.getElementById('chk-axes') as HTMLInputElement | null;
+// initialize gizmo visibility from checkbox (works before run)
+if (gizmoCanvas && chkAxes) {
+  gizmoCanvas.style.display = chkAxes.checked ? 'block' : 'none';
+}
+// wire checkbox to gizmo and runtime showAxes (if running)
+if (chkAxes) {
+  chkAxes.addEventListener('change', () => {
+    const on = chkAxes.checked;
+    if (gizmoCanvas) gizmoCanvas.style.display = on ? 'block' : 'none';
+    try {
+      if (runtimeController && typeof runtimeController.setShowAxes === 'function') {
+        runtimeController.setShowAxes(on);
+      }
+    } catch (e) {
+      appendLog('Failed to update showAxes on runtime', String(e));
+    }
+    drawGizmo();
+  });
+}
 let ctx: CanvasRenderingContext2D | null = null;
 type EditorInstance = any;
 
@@ -205,6 +225,7 @@ function initCameraFromRenderer(posArr: [number, number, number], targetArr: [nu
   camDistance = Math.max(1e-3, Math.hypot(vx, vy, vz));
   camYaw = Math.atan2(vx, vz);
   camPitch = Math.asin(Math.max(-1, Math.min(1, vy / camDistance)));
+  drawGizmo();
 }
 
 let cameraScheduled = false;
@@ -223,6 +244,7 @@ function scheduleCameraUpdate() {
     if (runtimeController && typeof runtimeController.setCamera === 'function') {
       runtimeController.setCamera([camPos.x, camPos.y, camPos.z], [camTarget.x, camTarget.y, camTarget.z], camFocal);
     }
+    drawGizmo();
   });
 }
 
@@ -289,8 +311,8 @@ canvas.addEventListener('pointermove', (e) => {
   lastY = e.clientY;
   if (dragButton === 0) {
     // left drag: orbit
-    camYaw += dx * 0.005;
-    camPitch += -dy * 0.005;
+    camYaw -= dx * 0.005;
+    camPitch -= -dy * 0.005;
     const limit = Math.PI * 0.49;
     camPitch = Math.max(-limit, Math.min(limit, camPitch));
     updateCameraToRenderer();
@@ -323,6 +345,88 @@ function dot(a: number[], b: number[]) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 function cross(a: number[], b: number[]) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
 function lengthVec3(a: number[]) { return Math.hypot(a[0], a[1], a[2]); }
 function normalizeVec3(a: number[]) { const l = Math.max(1e-6, lengthVec3(a)); return [a[0]/l, a[1]/l, a[2]/l]; }
+
+// --- Gizmo drawing (CPU-side lightweight overlay) ---
+function drawGizmo() {
+  if (!gizmoCanvas) return;
+  // respect the checkbox: if axes hidden, clear and bail
+  if (chkAxes && !chkAxes.checked) {
+    const ctxClear = gizmoCanvas.getContext('2d');
+    if (ctxClear) ctxClear.clearRect(0,0,gizmoCanvas.width,gizmoCanvas.height);
+    return;
+  }
+  const ctx = gizmoCanvas.getContext('2d');
+  if (!ctx) return;
+  const w = gizmoCanvas.width;
+  const h = gizmoCanvas.height;
+  ctx.clearRect(0,0,w,h);
+  // translucent background already via CSS; draw border
+  ctx.save();
+  ctx.translate(w/2, h/2);
+  const size = Math.min(w,h) * 0.36;
+
+  // camera basis
+  const cam = { pos: [camPos.x, camPos.y, camPos.z], target: [camTarget.x, camTarget.y, camTarget.z] };
+  const forward = normalizeVec3([cam.target[0]-cam.pos[0], cam.target[1]-cam.pos[1], cam.target[2]-cam.pos[2]]);
+  let upRef = [0,1,0];
+  if (Math.abs(dot(forward, upRef)) > 0.999) upRef = [0,0,1];
+  const right = normalizeVec3(cross(forward, upRef));
+  const up = normalizeVec3(cross(right, forward));
+
+  // project each world axis into camera-local XY plane
+  const axes = [ {v:[1,0,0], color:'#ff6666', label:'X'}, {v:[0,1,0], color:'#66ff66', label:'Y'}, {v:[0,0,1], color:'#6ea0ff', label:'Z'} ];
+  for (const a of axes) {
+    const vx = dot(right, a.v);
+    const vy = dot(up, a.v);
+    // draw from center outward
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(vx * size, -vy * size);
+    ctx.strokeStyle = a.color;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    // arrowhead
+    ctx.beginPath();
+    const tx = vx * size;
+    const ty = -vy * size;
+    ctx.arc(tx, ty, 6, 0, Math.PI*2);
+    ctx.fillStyle = a.color;
+    ctx.fill();
+    // label
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(a.label, tx + Math.sign(vx||1)*10, ty - Math.sign(vy||1)*10 + 4);
+  }
+
+  // center marker
+  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fillStyle='#eee'; ctx.fill();
+  ctx.restore();
+}
+
+// clicking the gizmo resets the view to a default orientation
+if (gizmoCanvas) {
+  gizmoCanvas.addEventListener('click', () => {
+    // reset target to origin and orbit angles to defaults
+    camTarget.x = 0; camTarget.y = 0; camTarget.z = 0;
+    camYaw = 0; camPitch = 0;
+    // try to keep a reasonable distance: if runtime knows scene radius use it
+    try {
+      const cam = runtimeController?.getCamera?.();
+      if (cam) {
+        const pos = cam.pos;
+        const dx = pos[0] - 0; const dy = pos[1] - 0; const dz = pos[2] - 0;
+        camDistance = Math.max(1.0, Math.hypot(dx, dy, dz));
+      } else {
+        camDistance = Math.max(1.0, camDistance);
+      }
+    } catch (_) {
+      camDistance = Math.max(1.0, camDistance);
+    }
+    updateCameraToRenderer();
+  });
+}
 
 async function initMonacoEditor() {
   try {

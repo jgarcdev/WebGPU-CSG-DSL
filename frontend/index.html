@@ -25,7 +25,10 @@
 			</section>
 
 			<section id="output-pane">
-				<canvas id="viewport" width="640" height="480"></canvas>
+				<div class="viewport-wrapper" style="position:relative;display:inline-block;">
+					<canvas id="viewport" width="640" height="480"></canvas>
+					<canvas id="gizmo" width="160" height="160" style="position:absolute;right:8px;top:8px;pointer-events:auto;border-radius:4px;background:rgba(16,16,18,0.6);" title="View Gizmo"></canvas>
+				</div>
 				<div id="log">
 					<button id="btn-clear" class="log-clear" aria-label="Clear log">✕</button>
 					<div id="log-entries" class="log-entries"></div>
