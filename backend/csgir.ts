@@ -1,9 +1,9 @@
 import { Mat4, identityMat4, mulMat4, invertAffine } from "./utils.ts";
 
 export interface FlatLeaf {
-  kind: number;
-  params: [number, number, number, number];
-  inv: Mat4;
+  kind: number; // 0=Sphere, 1=Cube, 2=Cylinder
+  params: [number, number, number, number]; // up to 4 primitive parameters (unused params set to 0)
+  inv: Mat4; // world-space inverse matrix for this primitive leaf, used to transform rays into the primitive's local space for evaluation
 }
 
 export interface FlatToken {

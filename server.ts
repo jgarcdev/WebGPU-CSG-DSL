@@ -73,13 +73,6 @@ Deno.serve({ port: 8080 }, async (req) => {
     } catch (_) {
       _;
     }
-    try {
-      const fileUrl = new URL(`./frontend${pathname}`, import.meta.url);
-      const resp1 = await serveFileUrl(fileUrl, pathname);
-      if (resp1.status !== 404) return resp1;
-    } catch (_) {
-      _;
-    }
   }
 
   return new Response('Not found', { status: 404 });

@@ -138,7 +138,7 @@ btnRun.addEventListener('click', async () => {
   status.textContent = 'Running';
   try {
     // Default IR is read from default.csgir
-    const defaultIR = await fetch('/default.csgir').then((resp) => {
+    const defaultIR = await fetch('/frontend/default.csgir').then((resp) => {
       if (!resp.ok) throw new Error(`Failed to load default IR: ${resp.statusText}`);
       return resp.text();
     });
@@ -453,10 +453,10 @@ async function initMonacoEditor() {
       // try to load the workspace script as the initial editor content
       let initial = `// New script.csgl (empty)`;
       try {
-        const resp = await fetch('/script.csgl');
+        const resp = await fetch('/frontend/script.csgl');
         if (resp.ok) initial = await resp.text();
       } catch (_) {
-        appendLog('Could not load /script.csgl, using fallback');
+        appendLog('Could not load /frontend/script.csgl, using fallback');
       }
 
       monacoEditor = monaco.editor.create(editorHost, {

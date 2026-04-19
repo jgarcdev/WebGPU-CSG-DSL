@@ -137,7 +137,7 @@ export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLo
   const tokenRaw = createTokenBufferData(flattened.tokens);
   const showAxes = options?.showAxes ? 1 : 0;
   // initial camera: position the camera along +Z looking at origin, distance based on sceneRadius
-  const sceneRadius = (flattened as any).sceneRadius ?? 5.0;
+  const sceneRadius = flattened.sceneRadius ?? 5.0;
   const initDistance = Math.max(1.0, sceneRadius * 1.6);
   const cameraPosInit: [number, number, number] = [0.0, 0.0, initDistance];
   const cameraTargetInit: [number, number, number] = [0.0, 0.0, 0.0];
