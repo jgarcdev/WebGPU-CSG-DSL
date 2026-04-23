@@ -55,6 +55,7 @@ export function lex(source: string): Token[] {
   const isLower = (ch: string) => ch >= 'a' && ch <= 'z';
   const isUpper = (ch: string) => ch >= 'A' && ch <= 'Z';
   const isLetter = (ch: string) => isLower(ch) || isUpper(ch);
+  const isIdentifierPart = (ch: string) => isLetter(ch) || isDigit(ch) || ch === '_';
 
   const readIdentifier = () => {
     const tokenLine = line;
@@ -65,7 +66,7 @@ export function lex(source: string): Token[] {
       throw new LexerError('Expected identifier', tokenLine, tokenColumn);
     }
     advance();
-    while (isLetter(peek()) || isDigit(peek())) {
+    while (isIdentifierPart(peek())) {
       advance();
     }
     const lexeme = source.slice(start, index);

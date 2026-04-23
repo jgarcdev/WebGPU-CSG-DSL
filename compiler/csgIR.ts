@@ -181,6 +181,18 @@ export function lowerIR(ast: ProgramNode): string {
 			const s = stmt as RenderStatementNode;
 			const ref = exprToRef(s.argument);
 			renders.push(ref);
+		} else if (stmt.type === 'ConstBlock') {
+			// already handled by earlier semantic pass; ignore in lowering
+			continue;
+		} else if ((stmt as any).type === 'ExpressionStatement') {
+			// top-level expression: lower it for side-effects (primitives, transforms, attributes)
+			const expr = (stmt as any).expression as ExpressionNode;
+			try {
+				exprToRef(expr);
+			} catch (e) {
+				// ignore lowering errors for top-level expressions
+			}
+			continue;
 		} else {
 			throw new Error('Lowering: unexpected statement node');
 		}

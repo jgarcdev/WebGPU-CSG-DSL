@@ -29,13 +29,11 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
   monaco.languages.setMonarchTokensProvider('csgl', {
     defaultToken: '',
     tokenPostfix: '.csgl',
-    // keywords (control + DSL operations)
     keywords: [
-      'let', 'return', 'function',
-      // 'union', 'difference', 'intersection', 'translate', 'rotate', 'scale', 'color'
+      "let", "const"
     ],
     // Recognize constructors / primitive names (capitalized)
-    primitives: ['Sphere', 'Cube', 'Cylinder', 'Rectangle'],
+    primitives: ["Sphere", "Cube", "Cylinder", "Pyramid", "Cone", "Torus", "Octahedron"],
     tokenizer: {
       root: [
         // Constructors / primitive types (capitalized identifiers)
