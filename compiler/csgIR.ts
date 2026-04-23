@@ -1,4 +1,7 @@
-import { ProgramNode, StatementNode, LetStatementNode, RenderStatementNode, ExpressionNode, IdentifierNode, NumberLiteralNode, CallExpressionNode } from './ast.ts';
+import { 
+	ProgramNode, LetStatementNode, RenderStatementNode, ExpressionNode, IdentifierNode, 
+	NumberLiteralNode, CallExpressionNode, BinaryExpressionNode
+} from './ast.ts';
 
 const CSGIR_VERSION = "0.0.1";
 
@@ -61,12 +64,29 @@ function fmtNum(n: number): string {
 	return Number(n.toFixed(6)).toString();
 }
 
+function evaluateNumericExpression(expr: ExpressionNode): number {
+	if (expr.type === 'NumberLiteral') return (expr as NumberLiteralNode).value;
+	if (expr.type === 'BinaryExpression') {
+		const b = expr as BinaryExpressionNode;
+		const l = evaluateNumericExpression(b.left);
+		const r = evaluateNumericExpression(b.right);
+		switch (b.operator) {
+			case '+': return l + r;
+			case '-': return l - r;
+			case '*': return l * r;
+			case '/': return l / r;
+		}
+	}
+	throw new Error('Expected numeric expression');
+}
+
 export function lowerIR(ast: ProgramNode): string {
 	// tables
 	const primitives: string[] = [];
 	const transformations: string[] = []; // stored as parentRef + '[' + matrix ... + ']'
 	const csg: string[] = [];
 	const renders: string[] = [];
+	const attributes = new Map<string, string[]>();
 
 	const env = new Map<string,string>();
 
@@ -84,10 +104,11 @@ export function lowerIR(ast: ProgramNode): string {
 			const isLower = /^[a-z]/.test(callee);
 
 			if (isCapitalized) {
-				// primitives
+				// primitives: allow numeric expressions (NumberLiteral or BinaryExpression)
 				const args = call.args.map(a => {
-					if (a.type !== 'NumberLiteral') throw new Error('primitive args must be numeric');
-					return (a as NumberLiteralNode).raw;
+					if (a.type === 'NumberLiteral') return (a as NumberLiteralNode).raw;
+					if (a.type === 'BinaryExpression') return fmtNum(evaluateNumericExpression(a));
+					throw new Error('primitive args must be numeric expressions');
 				});
 				const entry = `${callee}[${args.join(', ')}]`;
 				const idx = primitives.length;
@@ -100,10 +121,10 @@ export function lowerIR(ast: ProgramNode): string {
 					// first arg is object
 					const parent = call.args[0];
 					const parentRef = exprToRef(parent as ExpressionNode);
-					// get numeric args
-					const a1 = (call.args[1] as NumberLiteralNode).value;
-					const a2 = (call.args[2] as NumberLiteralNode).value;
-					const a3 = (call.args[3] as NumberLiteralNode).value;
+					// get numeric args (allow expressions)
+					const a1 = evaluateNumericExpression(call.args[1]);
+					const a2 = evaluateNumericExpression(call.args[2]);
+					const a3 = evaluateNumericExpression(call.args[3]);
 
 					let M = matIdentity();
 					if (callee === 'translate') M = matTranslate(a1, a2, a3);
@@ -132,6 +153,18 @@ export function lowerIR(ast: ProgramNode): string {
 					csg.push(entry);
 					return `c.${idx}`;
 				}
+				if (callee === 'color') {
+					// color(obj, r, g, b) -> attach attribute to obj ref
+					const objRef = exprToRef(call.args[0]);
+					const r = evaluateNumericExpression(call.args[1]);
+					const g = evaluateNumericExpression(call.args[2]);
+					const b = evaluateNumericExpression(call.args[3]);
+					const attr = `Color[${fmtNum(r)}, ${fmtNum(g)}, ${fmtNum(b)}]`;
+					const list = attributes.get(objRef) ?? [];
+					list.push(attr);
+					attributes.set(objRef, list);
+					return objRef;
+				}
 			}
 
 			throw new Error(`Lowering: unsupported call ${call.callee.name}`);
@@ -142,15 +175,14 @@ export function lowerIR(ast: ProgramNode): string {
 	for (const stmt of ast.statements) {
 		if (stmt.type === 'LetStatement') {
 			const s = stmt as LetStatementNode;
-			const ref = (s.value.type === 'Identifier') ? exprToRef(s.value) : exprToRef(s.value);
+			const ref = exprToRef(s.value);
 			env.set(s.name.name, ref);
 		} else if (stmt.type === 'RenderStatement') {
 			const s = stmt as RenderStatementNode;
-			if (s.argument.type !== 'Identifier') throw new Error('Render expects identifier');
 			const ref = exprToRef(s.argument);
 			renders.push(ref);
 		} else {
-			// expression statements ignored for IR
+			throw new Error('Lowering: unexpected statement node');
 		}
 	}
 
@@ -160,9 +192,18 @@ export function lowerIR(ast: ProgramNode): string {
 	lines.push('[');
 	// Renders
 	lines.push('\tRenders[' + (renders.map(r => r).join(', ') ) + ']');
-	// Primitives
+	// Primitives (with optional attributes)
 	lines.push('\tPrimitives[');
-	for (const p of primitives) lines.push('\t\t' + p);
+	for (let i = 0; i < primitives.length; i++) {
+		const p = primitives[i];
+		const ref = `p.${i}`;
+		const attrs = attributes.get(ref);
+		if (attrs && attrs.length > 0) {
+			lines.push('\t\t' + p + ' { ' + attrs.join(', ') + ' }');
+		} else {
+			lines.push('\t\t' + p);
+		}
+	}
 	lines.push('\t]');
 	// Transformations
 	lines.push('\tTransformations[');

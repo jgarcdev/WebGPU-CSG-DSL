@@ -34,6 +34,10 @@ Object
 - `Sphere(radius) -> SphereObject`
 - `Cube(size) -> CubeObject`
 - `Cylinder(radius, height) -> CylinderObject`
+- `Pyramid(baseSize, height) -> PyramidObject`
+- `Cone(radius, height) -> ConeObject`
+- `Torus(majorRadius, minorRadius) -> TorusObject`
+- `Octahedron(size) -> OctahedronObject`
 
 ```
 let sphere = Sphere(1.2)
@@ -73,9 +77,13 @@ let complexObject = union(
 )
 ```
 
-## Other
+## Effects
 
 - `color(obj, r, g, b) -> ColoredObject`
+	- RGB between 0 and 255
+
+
+
 
 ## CSG-IR
 
@@ -164,7 +172,27 @@ The corresponding CSG-IR may look like:
 ]
 ```
 
+### Attributes
 
+Primitives may contain certain attributes, such as `color` or `material`.
+These attributes are defined as part of the primitive entry. The format is as follows:
+```
+Primitive[
+	Type[...params]{
+		Attribute1[...params]
+		Attribute2[...params]
+		...
+	}
+]
+```
+For example, a red sphere with radius 1.2 may be represented as:
+```
+Primitive[
+	Sphere[1.2]{
+		Color[255, 0, 0]
+	}
+]
+```
 
 ## Self-Notes
 

@@ -5,8 +5,14 @@ export type TokenType =
   | 'Identifier'
   | 'Number'
   | 'Keyword'
+  | 'Plus'
+  | 'Minus'
+  | 'Star'
+  | 'Slash'
   | 'LParen'
   | 'RParen'
+  | 'LBrace'
+  | 'RBrace'
   | 'Comma'
   | 'Equals'
   | 'Semicolon'
@@ -64,7 +70,7 @@ export function lex(source: string): Token[] {
     }
     const lexeme = source.slice(start, index);
 
-    if (lexeme === 'let' || lexeme === 'Render') {
+    if (lexeme === 'let' || lexeme === 'Render' || lexeme === 'const') {
       addToken('Keyword', lexeme, tokenLine, tokenColumn);
       return;
     }
@@ -159,8 +165,25 @@ export function lex(source: string): Token[] {
     const tokenColumn = column;
 
     switch (ch) {
+      case '*':
+        addToken('Star', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      case '/':
+        // comments were handled earlier; here plain slash is an operator
+        addToken('Slash', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
       case '(':
         addToken('LParen', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      case '{':
+        addToken('LBrace', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      case '}':
+        addToken('RBrace', ch, tokenLine, tokenColumn);
         advance();
         continue;
       case ')':
@@ -181,6 +204,17 @@ export function lex(source: string): Token[] {
         continue;
       default:
         break;
+    }
+
+    // Handle plus/minus: decide whether operator or numeric sign based on previous token
+    if (ch === '+' || ch === '-') {
+      const prev = [...tokens].reverse().find(t => t.type !== 'EOL' && t.type !== 'Semicolon');
+      if (prev && (prev.type === 'Number' || prev.type === 'Identifier' || prev.type === 'RParen')) {
+        addToken(ch === '+' ? 'Plus' : 'Minus', ch, tokenLine, tokenColumn);
+        advance();
+        continue;
+      }
+      // otherwise treat as number sign
     }
 
     if (isLetter(ch)) {
