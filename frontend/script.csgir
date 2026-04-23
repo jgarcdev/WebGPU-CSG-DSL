@@ -1,13 +1,23 @@
-[0.0.1] [
-	Renders[c.3] 
+[0.0.1][
+	Renders[c.3]
 	Primitives[
-		Cube[1]
-		Sphere[0.65]
-		Cylinder[0.35, 1.01]
-		Cylinder[0.35, 1.01]
-		Cylinder[0.35, 1.01]
+		Cube[1]{
+			Color[0, 255, 255]
+		}
+		Sphere[0.65]{
+			Color[255, 255, 0]
+		}
+		Cylinder[0.35, 1.01]{
+			Color[255, 0, 255]
+		}
+		Cylinder[0.35, 1.01]{
+			Color[0, 255, 0]
+		}
+		Cylinder[0.35, 1.01]{
+			Color[255, 0, 0]
+		}
 	]
-	Transformations[ 
+	Transformations[
 		p.3[0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 		p.4[1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]
 	]
