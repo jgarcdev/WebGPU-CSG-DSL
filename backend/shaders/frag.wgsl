@@ -16,6 +16,7 @@ struct LeafNode {
   _pad1: u32,
   _pad2: u32,
   params: vec4f,
+  color: vec4f,
   inv0: vec4f,
   inv1: vec4f,
   inv2: vec4f,
@@ -72,6 +73,40 @@ fn sdfCylinder(p: vec3f, radius: f32, height: f32) -> f32 {
   return insideDist + outsideDist;
 }
 
+fn sdfPyramid(p: vec3f, height: f32) -> f32 {
+  let m2 = height * height + 0.25;
+  var xz: vec2f = abs(p.xz);
+  xz = select(xz, xz.yx, xz[1] > xz[0]);
+  xz = xz - vec2f(0.5);
+
+  let q = vec3f(xz[1], height * p.y - 0.5 * xz[0], height * xz[0] + 0.5 * p.y);
+  let s = max(-q.x, 0.);
+  let t = clamp((q.y - 0.5 * xz[1]) / (m2 + 0.25), 0., 1.);
+
+  let a = m2 * (q.x + s) * (q.x + s) + q.y * q.y;
+  let b = m2 * (q.x + 0.5 * t) * (q.x + 0.5 * t) + (q.y - m2 * t) * (q.y - m2 * t);
+
+  let d2 = min(a, b) * step(min(q.y, -q.x * m2 - q.y * 0.5), 0.);
+  return sqrt((d2 + q.z * q.z) / m2) * sign(max(q.z, -p.y));
+}
+
+fn sdfCone(p: vec3f, radius: f32, height: f32) -> f32 {
+  let q = vec2f(length(p.xz), p.y);
+  let c = vec2f(radius, height);
+  let w = q - c * clamp(dot(q, c) / dot(c, c), 0.0, 1.0);
+  return length(w) * sign(q.x * c.y - q.y * c.x);
+}
+
+fn sdfTorus(p: vec3f, radius1: f32, radius2: f32) -> f32 {
+  let q = vec2f(length(p.xz) - radius1, p.y);
+  return length(q) - radius2;
+}
+
+fn sdfOctahedron(p: vec3f, size: f32) -> f32 {
+  let q = abs(p);
+  return (q.x + q.y + q.z - size) * 0.57735027;
+}
+
 
 
 fn sdfLeaf(idx: u32, p: vec3f) -> f32 {
@@ -87,6 +122,18 @@ fn sdfLeaf(idx: u32, p: vec3f) -> f32 {
     case 2u: {
       return sdfCylinder(lp, leaf.params.x, leaf.params.y);
     }
+    case 3u: {
+      return sdfPyramid(lp, leaf.params.x);
+    }
+    case 4u: {
+      return sdfCone(lp, leaf.params.x, leaf.params.y);
+    }
+    case 5u: {
+      return sdfTorus(lp, leaf.params.x, leaf.params.y);
+    }
+    case 6u: {
+      return sdfOctahedron(lp, leaf.params.x);
+    }
     default: {
       return 1e6;
     }
@@ -97,6 +144,7 @@ fn sdfScene(p: vec3f) -> f32 {
   var stack: array<f32, 128>;
   var sp: u32 = 0u;
 
+  // Go through the "program"
   for (var i: u32 = 0u; i < scene.tokenCount; i = i + 1u) {
     let tok = tokens[i];
     if (tok.kind == 0u) {
@@ -201,6 +249,20 @@ fn axisOverlayRay(ro: vec3f, dir: vec3f) -> vec4f {
   return vec4f(outCol, outA);
 }
 
+fn getLeafColorAtPoint(p: vec3f) -> vec3f {
+  var bestIdx: u32 = 0u;
+  var bestDist: f32 = 1e9;
+  for (var i: u32 = 0u; i < scene.leafCount; i = i + 1u) {
+    let d = abs(sdfLeaf(i, p));
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
+  }
+  let leaf = leaves[bestIdx];
+  return vec3f(leaf.color.x, leaf.color.y, leaf.color.z);
+}
+
 @fragment
 fn main(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   let uv = (fragPos.xy / scene.resolution) * 2.0 - vec2f(1.0, 1.0);
@@ -256,6 +318,11 @@ fn main(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   var col = vec3f(0.85, 0.9, 1.0) * (0.12 + 0.88 * diff) + vec3f(0.15, 0.2, 0.3) * rim * 0.25;
   if (axisOverlay.w > 0.0) {
     col = mix(col, axisOverlay.xyz, axisOverlay.w);
+  }
+  // Blend with closest leaf color at hit point (leaf colors are normalized floats)
+  if (scene.leafCount > 0u) {
+    let leafCol = getLeafColorAtPoint(p);
+    col = mix(col, leafCol, 0.9);
   }
   return vec4f(col, 1.0);
 }

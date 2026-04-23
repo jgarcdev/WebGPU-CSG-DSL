@@ -219,11 +219,24 @@ export function lowerIR(ast: ProgramNode): string {
 	lines.push('\t]');
 	// Transformations
 	lines.push('\tTransformations[');
-	for (const t of transformations) lines.push('\t\t' + t);
+	for (let i = 0; i < transformations.length; i++) {
+		const t = transformations[i];
+		const ref = `t.${i}`;
+		const attrsT = attributes.get(ref);
+		if (attrsT && attrsT.length > 0) lines.push('\t\t' + t + ' { ' + attrsT.join(', ') + ' }');
+		else lines.push('\t\t' + t);
+	}
 	lines.push('\t]');
 	// CSG
+	// CSG
 	lines.push('\tCSG[');
-	for (const c of csg) lines.push('\t\t' + c);
+	for (let i = 0; i < csg.length; i++) {
+		const c = csg[i];
+		const ref = `c.${i}`;
+		const attrsC = attributes.get(ref);
+		if (attrsC && attrsC.length > 0) lines.push('\t\t' + c + ' { ' + attrsC.join(', ') + ' }');
+		else lines.push('\t\t' + c);
+	}
 	lines.push('\t]');
 	lines.push(']');
 

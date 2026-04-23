@@ -15,7 +15,7 @@ async function loadShaderSource(path: string): Promise<string> {
 }
 
 function createLeafBufferData(leaves: FlatLeaf[]): ArrayBuffer {
-  const stride = 96;
+  const stride = 112; // added vec4 color after params
   const buffer = new ArrayBuffer(stride * leaves.length);
   const view = new DataView(buffer);
 
@@ -30,8 +30,15 @@ function createLeafBufferData(leaves: FlatLeaf[]): ArrayBuffer {
     view.setFloat32(base + 20, leaf.params[1], true);
     view.setFloat32(base + 24, leaf.params[2], true);
     view.setFloat32(base + 28, leaf.params[3], true);
+    // write color vec4 (normalized floats)
+    const color = leaf.color ?? [0, 0, 0, 0];
+    view.setFloat32(base + 32, color[0], true);
+    view.setFloat32(base + 36, color[1], true);
+    view.setFloat32(base + 40, color[2], true);
+    view.setFloat32(base + 44, color[3] ?? 0.0, true);
+    // write inverse matrix starting at offset 48
     for (let j = 0; j < 16; j++) {
-      view.setFloat32(base + 32 + j * 4, leaf.inv[j], true);
+      view.setFloat32(base + 48 + j * 4, leaf.inv[j], true);
     }
   }
 
@@ -88,7 +95,7 @@ function createUniformBufferData(width: number, height: number, leafCount: numbe
   return buffer;
 }
 
-export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLog?: (msg: string) => void, options?: { showAxes?: boolean }) {
+export async function webgpuMain(canvas: any, irCode: string, onLog?: (msg: string) => void, options?: { showAxes?: boolean }) {
   onLog?.("Received IR code:\n" + irCode);
 
   onLog?.("Initializing WebGPU");
@@ -128,6 +135,11 @@ export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLo
   }
 
   const flattened = flattenIR(ir);
+  // Diagnostic: log per-leaf color values to help debug color propagation
+  for (let i = 0; i < flattened.leaves.length; i++) {
+    const lf = flattened.leaves[i];
+    onLog?.(`Leaf[${i}] color = ${lf.color[0].toFixed(6)}, ${lf.color[1].toFixed(6)}, ${lf.color[2].toFixed(6)}, ${lf.color[3].toFixed(6)}`);
+  }
   if (flattened.leaves.length === 0 || flattened.tokens.length === 0) {
     throw new Error("Could not flatten IR into a renderable scene");
   }
