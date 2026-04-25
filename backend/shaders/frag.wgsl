@@ -73,28 +73,33 @@ fn sdfCylinder(p: vec3f, radius: f32, height: f32) -> f32 {
   return insideDist + outsideDist;
 }
 
-fn sdfPyramid(p: vec3f, height: f32) -> f32 {
-  let m2 = height * height + 0.25;
+fn sdfPyramid(p: vec3f, base: f32, h: f32) -> f32 {
+  let m2 = h * h + base * base;
   var xz: vec2f = abs(p.xz);
   xz = select(xz, xz.yx, xz[1] > xz[0]);
-  xz = xz - vec2f(0.5);
+  xz = xz - vec2f(base);
 
-  let q = vec3f(xz[1], height * p.y - 0.5 * xz[0], height * xz[0] + 0.5 * p.y);
+  let q = vec3f(xz[1], h * p.y - base * xz[0], h * xz[0] + base * p.y);
   let s = max(-q.x, 0.);
-  let t = clamp((q.y - 0.5 * xz[1]) / (m2 + 0.25), 0., 1.);
+  let t = clamp((q.y - base * xz[1]) / (m2 + 0.25), 0., 1.);
 
   let a = m2 * (q.x + s) * (q.x + s) + q.y * q.y;
-  let b = m2 * (q.x + 0.5 * t) * (q.x + 0.5 * t) + (q.y - m2 * t) * (q.y - m2 * t);
+  let b = m2 * (q.x + base * t) * (q.x + base * t) + (q.y - m2 * t) * (q.y - m2 * t);
 
-  let d2 = min(a, b) * step(min(q.y, -q.x * m2 - q.y * 0.5), 0.);
+  let d2 = min(a, b) * step(min(q.y, -q.x * m2 - q.y * base), 0.);
   return sqrt((d2 + q.z * q.z) / m2) * sign(max(q.z, -p.y));
 }
 
 fn sdfCone(p: vec3f, radius: f32, height: f32) -> f32 {
-  let q = vec2f(length(p.xz), p.y);
-  let c = vec2f(radius, height);
-  let w = q - c * clamp(dot(q, c) / dot(c, c), 0.0, 1.0);
-  return length(w) * sign(q.x * c.y - q.y * c.x);
+  let sincos = vec2f(sin(radius), cos(radius));
+  let q = height * vec2f(sincos.x / sincos.y, -1.);
+  let w = vec2f(length(p.xz), p.y - height); // doing `- height` places the base at the x-z plane
+  let a = w - q * clamp(dot(w,q) / dot(q,q), 0., 1.);
+  let b = w - q * vec2f(clamp(w.x / q.x, 0., 1.), 1.);
+  let k = sign(q.y);
+  let d = min(dot(a, a), dot(b, b));
+  let s = max(k * (w.x * q.y - w.y * q.x), k * (w.y - q.y));
+  return sqrt(d) * sign(s);
 }
 
 fn sdfTorus(p: vec3f, radius1: f32, radius2: f32) -> f32 {
@@ -123,7 +128,7 @@ fn sdfLeaf(idx: u32, p: vec3f) -> f32 {
       return sdfCylinder(lp, leaf.params.x, leaf.params.y);
     }
     case 3u: {
-      return sdfPyramid(lp, leaf.params.x);
+      return sdfPyramid(lp, leaf.params.x, leaf.params.y);
     }
     case 4u: {
       return sdfCone(lp, leaf.params.x, leaf.params.y);
