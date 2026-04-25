@@ -95,7 +95,7 @@ function createUniformBufferData(width: number, height: number, leafCount: numbe
   return buffer;
 }
 
-export async function webgpuMain(canvas: any, irCode: string, onLog?: (msg: string) => void, options?: { showAxes?: boolean }) {
+export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLog?: (msg: string) => void, options?: { showAxes?: boolean }) {
   onLog?.("Received IR code:\n" + irCode);
 
   onLog?.("Initializing WebGPU");
@@ -202,7 +202,7 @@ export async function webgpuMain(canvas: any, irCode: string, onLog?: (msg: stri
     ],
   });
 
-  function renderOnce() {
+  function renderOnce(log = false) {
     const encoder = device.createCommandEncoder();
     const view = context!.getCurrentTexture()!.createView();
     const pass = encoder.beginRenderPass({
@@ -220,10 +220,10 @@ export async function webgpuMain(canvas: any, irCode: string, onLog?: (msg: stri
     pass.draw(3, 1, 0, 0);
     pass.end();
     device.queue.submit([encoder.finish()]);
-    onLog?.("WebGPU render completed");
+    if (log) onLog?.("WebGPU render completed");
   }
 
-  renderOnce();
+  renderOnce(true);
 
   // Controller for live updates without recreating pipeline/buffers
   return {
@@ -231,7 +231,7 @@ export async function webgpuMain(canvas: any, irCode: string, onLog?: (msg: stri
       const v = new Uint32Array([show ? 1 : 0]);
       // showAxes is at byte offset 28
       device.queue.writeBuffer(uniformBuffer, 28, v.buffer, 0, 4);
-      renderOnce();
+      renderOnce(false);
     },
     setCamera(pos: [number, number, number], target: [number, number, number], focal: number) {
       const cam = new Float32Array([pos[0], pos[1], pos[2], 0.0]);
@@ -240,7 +240,7 @@ export async function webgpuMain(canvas: any, irCode: string, onLog?: (msg: stri
       device.queue.writeBuffer(uniformBuffer, 32, cam.buffer, cam.byteOffset, 16);
       device.queue.writeBuffer(uniformBuffer, 48, tgt.buffer, tgt.byteOffset, 16);
       device.queue.writeBuffer(uniformBuffer, 64, params.buffer, params.byteOffset, 16);
-      renderOnce();
+      renderOnce(false);
     }
     , getCamera() {
       return { pos: cameraPosInit, target: cameraTargetInit, focal: focalInit };
