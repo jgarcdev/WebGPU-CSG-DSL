@@ -453,7 +453,7 @@ export function flattenIR(ir: ParsedIR): { leaves: FlatLeaf[]; tokens: FlatToken
 
 			const leafIndex = leaves.length;
 			// determine leaf color: inheritedColor overrides primitive's declared color
-			const primColor: [number, number, number, number] = prim.color ? [prim.color[0], prim.color[1], prim.color[2], 0.0] : null as any;
+			const primColor: [number, number, number, number] | null = prim.color ? [prim.color[0], prim.color[1], prim.color[2], 0.0] : null;
 			const defaultColor: [number, number, number, number] = [0.6, 0.6, 0.6, 0.0];
 			const color: [number, number, number, number] = inheritedColor ?? primColor ?? defaultColor;
 			leaves.push({ kind, params: [p0, p1, p2, 0], inv: currentInv, color });

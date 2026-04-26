@@ -1,7 +1,7 @@
 import { lex } from "./lexer.ts";
 import { parse } from "./parser.ts";
 import { sema } from "./sema.ts";
-import { lowerIR } from "./csgIR.ts";
+import { lowerIR, optimizeIR } from "./csgIR.ts";
 import { Warnings } from "./warnings.ts";
 
 
@@ -18,7 +18,8 @@ export async function compile(source: string): Promise<{ ir: string, warnings: W
     const ast = parse(tokens);
     const { program, warnings } = sema(ast); 
     const ir = lowerIR(program);
-    return { ir, warnings };
+    const optimIR = optimizeIR(ir);
+    return { ir: optimIR, warnings };
   } catch (err) {
     throw err;
   }

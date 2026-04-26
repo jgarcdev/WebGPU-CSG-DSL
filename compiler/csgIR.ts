@@ -3,7 +3,7 @@ import {
 	NumberLiteralNode, CallExpressionNode, BinaryExpressionNode
 } from './ast.ts';
 
-const CSGIR_VERSION = "0.0.1";
+const CSGIR_VERSION = "0.1.0";
 
 
 function matIdentity(): number[] {
@@ -184,12 +184,12 @@ export function lowerIR(ast: ProgramNode): string {
 		} else if (stmt.type === 'ConstBlock') {
 			// already handled by earlier semantic pass; ignore in lowering
 			continue;
-		} else if ((stmt as any).type === 'ExpressionStatement') {
+		} else if (stmt.type === 'ExpressionStatement') {
 			// top-level expression: lower it for side-effects (primitives, transforms, attributes)
-			const expr = (stmt as any).expression as ExpressionNode;
+			const expr = stmt.expression as ExpressionNode;
 			try {
 				exprToRef(expr);
-			} catch (e) {
+			} catch (_) {
 				// ignore lowering errors for top-level expressions
 			}
 			continue;
@@ -243,4 +243,401 @@ export function lowerIR(ast: ProgramNode): string {
 	return lines.join('\n');
 }
 
-export default lowerIR;
+
+
+export function optimizeIR(ir: string): string {
+	function fail(message: string): never {
+		throw new Error(`IR optimize error: ${message}`);
+	}
+
+	type RefKind = 'p' | 't' | 'c';
+	type Ref = { kind: RefKind; index: number; raw?: string };
+	type PrimitiveEntry = { head: string; payload: string; attrs: string[] };
+	type TransformEntry = { source: Ref; matrix: number[]; attrs: string[] };
+	type CsgEntry = { op: string; left: Ref; right: Ref; attrs: string[] };
+
+	function isWs(ch: string): boolean {
+		return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
+	}
+
+	function skipWs(input: string, start: number): number {
+		let i = start;
+		while (i < input.length && isWs(input[i])) i++;
+		return i;
+	}
+
+	function findMatchingBracket(input: string, openIndex: number): number {
+		if (input[openIndex] !== '[') fail(`expected '[' at index ${openIndex}`);
+		let depth = 0;
+		for (let i = openIndex; i < input.length; i++) {
+			if (input[i] === '[') depth++;
+			else if (input[i] === ']') {
+				depth--;
+				if (depth === 0) return i;
+			}
+		}
+		fail('unterminated bracketed block');
+	}
+
+	function findMatchingBrace(input: string, openIndex: number): number {
+		if (input[openIndex] !== '{') fail(`expected '{' at index ${openIndex}`);
+		let depth = 0;
+		for (let i = openIndex; i < input.length; i++) {
+			if (input[i] === '{') depth++;
+			else if (input[i] === '}') {
+				depth--;
+				if (depth === 0) return i;
+			}
+		}
+		fail('unterminated brace block');
+	}
+
+	function parseBlock(input: string, openIndex: number): { content: string; nextIndex: number } {
+		const closeIndex = findMatchingBracket(input, openIndex);
+		return {
+			content: input.slice(openIndex + 1, closeIndex),
+			nextIndex: closeIndex + 1,
+		};
+	}
+
+	function parseRef(raw: string): Ref {
+		const text = raw.trim();
+		const m = /^([ptc])\.(\d+)$/.exec(text);
+		if (!m) fail(`invalid reference '${text}'`);
+		return { kind: m[1] as RefKind, index: Number(m[2]), raw: text };
+	}
+
+	function refToString(ref: Ref): string {
+		return `${ref.kind}.${ref.index}`;
+	}
+
+	function parseNumberList(raw: string): number[] {
+		const text = raw.trim();
+		if (!text) return [];
+		return text.split(',').map((x) => x.trim()).filter((x) => x.length > 0).map((x) => {
+			const n = Number(x);
+			if (!Number.isFinite(n)) fail(`invalid number '${x}'`);
+			return n;
+		});
+	}
+
+	function splitTopLevelItems(s: string): string[] {
+		const out: string[] = [];
+		let buf = '';
+		let depth = 0;
+		for (let i = 0; i < s.length; i++) {
+			const ch = s[i];
+			if (ch === '[' || ch === '{') {
+				depth++;
+				buf += ch;
+				continue;
+			}
+			if (ch === ']' || ch === '}') {
+				depth = Math.max(0, depth - 1);
+				buf += ch;
+				continue;
+			}
+			if (ch === ',' && depth === 0) {
+				if (buf.trim().length > 0) out.push(buf.trim());
+				buf = '';
+				continue;
+			}
+			buf += ch;
+		}
+		if (buf.trim().length > 0) out.push(buf.trim());
+		return out;
+	}
+
+	function parseEntryBlocks(sectionContent: string): Array<{ head: string; payload: string; attrs: string[] }> {
+		const entries: Array<{ head: string; payload: string; attrs: string[] }> = [];
+		let i = 0;
+
+		while (i < sectionContent.length) {
+			i = skipWs(sectionContent, i);
+			if (i >= sectionContent.length) break;
+			if (sectionContent[i] === ',') {
+				i++;
+				continue;
+			}
+
+			const open = sectionContent.indexOf('[', i);
+			if (open === -1) fail(`missing '[' for section entry near '${sectionContent.slice(i).trim()}'`);
+
+			const head = sectionContent.slice(i, open).trim();
+			if (!head) fail('empty section entry head');
+
+			const close = findMatchingBracket(sectionContent, open);
+			const payload = sectionContent.slice(open + 1, close);
+			let attrs: string[] = [];
+			let j = close + 1;
+			while (j < sectionContent.length && (isWs(sectionContent[j]) || sectionContent[j] === ',')) j++;
+			if (j < sectionContent.length && sectionContent[j] === '{') {
+				const braceClose = findMatchingBrace(sectionContent, j);
+				attrs = splitTopLevelItems(sectionContent.slice(j + 1, braceClose).trim());
+				j = braceClose + 1;
+			}
+
+			entries.push({ head, payload, attrs });
+
+			i = j;
+			while (i < sectionContent.length && (isWs(sectionContent[i]) || sectionContent[i] === ',')) i++;
+		}
+
+		return entries;
+	}
+
+	function parseRequiredSection(programBody: string, sectionName: string, cursor: number): { content: string; nextCursor: number } {
+		const start = programBody.indexOf(sectionName, cursor);
+		if (start === -1) fail(`missing required section '${sectionName}'`);
+
+		const between = programBody.slice(cursor, start).trim();
+		if (between.length > 0) {
+			fail(`unexpected tokens before section '${sectionName}': '${between}'`);
+		}
+
+		let open = start + sectionName.length;
+		open = skipWs(programBody, open);
+		if (programBody[open] !== '[') fail(`section '${sectionName}' must be followed by '['`);
+
+		const block = parseBlock(programBody, open);
+		return { content: block.content, nextCursor: block.nextIndex };
+	}
+
+	function mergeAttrs(outerAttrs: string[], innerAttrs: string[]): string[] {
+		if (outerAttrs.length === 0) return innerAttrs.slice();
+		if (innerAttrs.length === 0) return outerAttrs.slice();
+		return [...outerAttrs, ...innerAttrs];
+	}
+
+	function refKey(ref: Ref): string {
+		return `${ref.kind}.${ref.index}`;
+	}
+
+	const input = ir.trim();
+	if (!input) return ir;
+
+	let i = skipWs(input, 0);
+	if (input[i] !== '[') return ir;
+
+	const firstBlock = parseBlock(input, i);
+	const firstText = firstBlock.content.trim();
+
+	let version: string | null = null;
+	let programBody = '';
+	let tailIndex = firstBlock.nextIndex;
+
+	if (/^\d+\.\d+\.\d+$/.test(firstText)) {
+		version = firstText;
+		i = skipWs(input, firstBlock.nextIndex);
+		if (input[i] !== '[') fail('expected program block after version block');
+		const programBlock = parseBlock(input, i);
+		programBody = programBlock.content;
+		tailIndex = programBlock.nextIndex;
+	} else {
+		programBody = firstBlock.content;
+	}
+
+	if (input.slice(tailIndex).trim().length > 0) {
+		fail('unexpected trailing tokens after program block');
+	}
+
+	let cursor = 0;
+	const rendersSection = parseRequiredSection(programBody, 'Renders', cursor);
+	cursor = rendersSection.nextCursor;
+	const primitivesSection = parseRequiredSection(programBody, 'Primitives', cursor);
+	cursor = primitivesSection.nextCursor;
+	const transformationsSection = parseRequiredSection(programBody, 'Transformations', cursor);
+	cursor = transformationsSection.nextCursor;
+	const csgSection = parseRequiredSection(programBody, 'CSG', cursor);
+	cursor = csgSection.nextCursor;
+	if (programBody.slice(cursor).trim().length > 0) {
+		fail(`unexpected tokens after CSG section: '${programBody.slice(cursor).trim()}'`);
+	}
+
+	const renders: Ref[] = splitTopLevelItems(rendersSection.content).map(parseRef);
+	const primitiveEntries = parseEntryBlocks(primitivesSection.content);
+	const primitives: PrimitiveEntry[] = primitiveEntries.map((e) => ({ head: e.head, payload: e.payload, attrs: e.attrs }));
+
+	const transformEntries = parseEntryBlocks(transformationsSection.content);
+	const oldTransforms: TransformEntry[] = transformEntries.map((e) => ({
+		source: parseRef(e.head),
+		matrix: parseNumberList(e.payload),
+		attrs: e.attrs,
+	}));
+
+	for (const t of oldTransforms) {
+		if (t.matrix.length !== 16) fail(`transformation '${refToString(t.source)}' must contain exactly 16 matrix values`);
+	}
+
+	const csgEntries = parseEntryBlocks(csgSection.content);
+	const oldCsg: CsgEntry[] = csgEntries.map((e) => {
+		const refs = splitTopLevelItems(e.payload).map(parseRef);
+		if (refs.length !== 2) fail(`CSG op '${e.head}' must contain exactly 2 object references`);
+		return { op: e.head, left: refs[0], right: refs[1], attrs: e.attrs };
+	});
+
+	const newTransforms: TransformEntry[] = [];
+	const newCsg: CsgEntry[] = [];
+	const transformIntern = new Map<string, number>();
+	const csgIntern = new Map<string, number>();
+	const refMemo = new Map<string, Ref>();
+
+	function internTransform(entry: TransformEntry): Ref {
+		const matrixKey = entry.matrix.map(fmtNum).join(',');
+		const key = `${refKey(entry.source)}|${matrixKey}|${entry.attrs.join('||')}`;
+		const existing = transformIntern.get(key);
+		if (existing !== undefined) return { kind: 't', index: existing };
+		const idx = newTransforms.length;
+		newTransforms.push(entry);
+		transformIntern.set(key, idx);
+		return { kind: 't', index: idx };
+	}
+
+	function internCsg(entry: CsgEntry): Ref {
+		const key = `${entry.op}|${refKey(entry.left)}|${refKey(entry.right)}|${entry.attrs.join('||')}`;
+		const existing = csgIntern.get(key);
+		if (existing !== undefined) return { kind: 'c', index: existing };
+		const idx = newCsg.length;
+		newCsg.push(entry);
+		csgIntern.set(key, idx);
+		return { kind: 'c', index: idx };
+	}
+
+	function optimizeRef(ref: Ref): Ref {
+		const memoKey = refKey(ref);
+		const memoized = refMemo.get(memoKey);
+		if (memoized) return memoized;
+
+		if (ref.kind === 'p') {
+			const out = { kind: 'p', index: ref.index } as Ref;
+			refMemo.set(memoKey, out);
+			return out;
+		}
+
+		if (ref.kind === 't') {
+			const tr = oldTransforms[ref.index];
+			if (!tr) fail(`reference '${memoKey}' out of range for Transformations`);
+			const sourceOpt = optimizeRef(tr.source);
+			let collapsedSource = sourceOpt;
+			let collapsedMatrix = tr.matrix.slice();
+			let collapsedAttrs = tr.attrs.slice();
+
+			if (sourceOpt.kind === 't') {
+				const parent = newTransforms[sourceOpt.index];
+				if (!parent) fail(`optimized transformation '${refKey(sourceOpt)}' missing`);
+				collapsedSource = parent.source;
+				collapsedMatrix = matMul(collapsedMatrix, parent.matrix);
+				collapsedAttrs = mergeAttrs(collapsedAttrs, parent.attrs);
+			}
+
+			const out = internTransform({
+				source: collapsedSource,
+				matrix: collapsedMatrix,
+				attrs: collapsedAttrs,
+			});
+			refMemo.set(memoKey, out);
+			return out;
+		}
+
+		const node = oldCsg[ref.index];
+		if (!node) fail(`reference '${memoKey}' out of range for CSG`);
+		const left = optimizeRef(node.left);
+		const right = optimizeRef(node.right);
+		const out = internCsg({ op: node.op, left, right, attrs: node.attrs.slice() });
+		refMemo.set(memoKey, out);
+		return out;
+	}
+
+	const optimizedRenders = renders.map((r) => optimizeRef(r));
+
+	const usedTransforms = new Set<number>();
+	const usedCsg = new Set<number>();
+
+	function markUsed(ref: Ref): void {
+		if (ref.kind === 't') {
+			if (usedTransforms.has(ref.index)) return;
+			usedTransforms.add(ref.index);
+			const t = newTransforms[ref.index];
+			if (!t) fail(`optimized reference '${refToString(ref)}' out of range`);
+			markUsed(t.source);
+			return;
+		}
+		if (ref.kind === 'c') {
+			if (usedCsg.has(ref.index)) return;
+			usedCsg.add(ref.index);
+			const c = newCsg[ref.index];
+			if (!c) fail(`optimized reference '${refToString(ref)}' out of range`);
+			markUsed(c.left);
+			markUsed(c.right);
+		}
+	}
+
+	for (const r of optimizedRenders) markUsed(r);
+
+	const tIndexMap = new Map<number, number>();
+	const cIndexMap = new Map<number, number>();
+	const compactTransforms: TransformEntry[] = [];
+	const compactCsg: CsgEntry[] = [];
+
+	for (let idx = 0; idx < newTransforms.length; idx++) {
+		if (!usedTransforms.has(idx)) continue;
+		tIndexMap.set(idx, compactTransforms.length);
+		compactTransforms.push(newTransforms[idx]);
+	}
+	for (let idx = 0; idx < newCsg.length; idx++) {
+		if (!usedCsg.has(idx)) continue;
+		cIndexMap.set(idx, compactCsg.length);
+		compactCsg.push(newCsg[idx]);
+	}
+
+	function remapRef(ref: Ref): Ref {
+		if (ref.kind === 'p') return ref;
+		if (ref.kind === 't') {
+			const mapped = tIndexMap.get(ref.index);
+			if (mapped === undefined) fail(`missing remap for '${refToString(ref)}'`);
+			return { kind: 't', index: mapped };
+		}
+		const mapped = cIndexMap.get(ref.index);
+		if (mapped === undefined) fail(`missing remap for '${refToString(ref)}'`);
+		return { kind: 'c', index: mapped };
+	}
+
+	const finalRenders = optimizedRenders.map(remapRef);
+	const finalTransforms = compactTransforms.map((t) => ({ ...t, source: remapRef(t.source) }));
+	const finalCsg = compactCsg.map((c) => ({
+		op: c.op,
+		left: remapRef(c.left),
+		right: remapRef(c.right),
+		attrs: c.attrs.slice(),
+	}));
+
+	const lines: string[] = [];
+	if (version) lines.push(`[${version}]`);
+	lines.push('[');
+	lines.push('\tRenders[' + finalRenders.map(refToString).join(', ') + ']');
+
+	lines.push('\tPrimitives[');
+	for (const p of primitives) {
+		const attrs = p.attrs.length > 0 ? ` { ${p.attrs.join(', ')} }` : '';
+		lines.push(`\t\t${p.head}[${p.payload}]${attrs}`);
+	}
+	lines.push('\t]');
+
+	lines.push('\tTransformations[');
+	for (const t of finalTransforms) {
+		const matrix = t.matrix.map(fmtNum).join(', ');
+		const attrs = t.attrs.length > 0 ? ` { ${t.attrs.join(', ')} }` : '';
+		lines.push(`\t\t${refToString(t.source)}[${matrix}]${attrs}`);
+	}
+	lines.push('\t]');
+
+	lines.push('\tCSG[');
+	for (const c of finalCsg) {
+		const attrs = c.attrs.length > 0 ? ` { ${c.attrs.join(', ')} }` : '';
+		lines.push(`\t\t${c.op}[${refToString(c.left)}, ${refToString(c.right)}]${attrs}`);
+	}
+	lines.push('\t]');
+	lines.push(']');
+
+	return lines.join('\n');
+}
