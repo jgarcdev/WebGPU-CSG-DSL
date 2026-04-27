@@ -1,9 +1,9 @@
-import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { lex } from "../../compiler/lexer.ts";
 import { parse } from "../../compiler/parser.ts";
 import { sema } from "../../compiler/sema.ts";
 import { lowerIR } from "../../compiler/csgIR.ts";
-import { parseIR } from "../csgir.ts";
+import { flattenIR, parseIR } from "../csgir.ts";
 
 Deno.test("parseIR handles compiler-emitted IR", () => {
   const src = `let s = Sphere(1.0);
@@ -18,7 +18,7 @@ Render(obj);`;
   const irText = lowerIR(program);
 
   const ir = parseIR(irText);
-  assertEquals(ir.version, "0.0.1");
+  assertEquals(ir.version, "0.1.0");
   assertEquals(ir.primitives.length, 2);
   assertEquals(ir.transformations.length, 1);
   assertEquals(ir.csg.length, 1);
@@ -75,4 +75,19 @@ Deno.test("parseIR requires all sections", () => {
 
   const err = assertThrows(() => parseIR(bad), Error);
   assertStringIncludes(err.message, "Transformations");
+});
+
+Deno.test("flattenIR adds a conservative step scale for non-uniform transforms", () => {
+  const src = `let floor = scale(Cube(4.0), 1.0, 0.2, 1.0);
+Render(floor);`;
+
+  const tokens = lex(src);
+  const ast = parse(tokens);
+  const { program } = sema(ast);
+  const irText = lowerIR(program);
+  const ir = parseIR(irText);
+  const flattened = flattenIR(ir);
+
+  assertEquals(flattened.leaves.length, 1);
+  assert(Math.abs(flattened.leaves[0].params[3] - 0.2) < 1e-3);
 });

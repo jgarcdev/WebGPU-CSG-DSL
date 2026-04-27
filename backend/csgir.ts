@@ -416,6 +416,46 @@ function refToGlobalIndex(ref: ObjectRef, ir: ParsedIR): number {
 	return ir.primitives.length + ir.transformations.length + ref.index;
 }
 
+function estimateConservativeStepScale(inv: Mat4): number {
+	// Need a world-space step that is guaranteed not to overshoot the surface.
+	// For a linear transform A, the conservative scale is 1 / ||A^-1||_2.
+	// Approximate ||A^-1||_2 by power iteration on (A^-1)^T (A^-1).
+	const a00 = inv[0], a01 = inv[1], a02 = inv[2];
+	const a10 = inv[4], a11 = inv[5], a12 = inv[6];
+	const a20 = inv[8], a21 = inv[9], a22 = inv[10];
+
+	const c00 = a00 * a00 + a10 * a10 + a20 * a20;
+	const c01 = a00 * a01 + a10 * a11 + a20 * a21;
+	const c02 = a00 * a02 + a10 * a12 + a20 * a22;
+	const c11 = a01 * a01 + a11 * a11 + a21 * a21;
+	const c12 = a01 * a02 + a11 * a12 + a21 * a22;
+	const c22 = a02 * a02 + a12 * a12 + a22 * a22;
+
+	let x0 = 1;
+	let x1 = 1;
+	let x2 = 1;
+	for (let i = 0; i < 12; i++) {
+		const y0 = c00 * x0 + c01 * x1 + c02 * x2;
+		const y1 = c01 * x0 + c11 * x1 + c12 * x2;
+		const y2 = c02 * x0 + c12 * x1 + c22 * x2;
+		const norm = Math.hypot(y0, y1, y2);
+		if (!Number.isFinite(norm) || norm < 1e-12) break;
+		x0 = y0 / norm;
+		x1 = y1 / norm;
+		x2 = y2 / norm;
+	}
+
+	const y0 = c00 * x0 + c01 * x1 + c02 * x2;
+	const y1 = c01 * x0 + c11 * x1 + c12 * x2;
+	const y2 = c02 * x0 + c12 * x1 + c22 * x2;
+	const lambdaMax = x0 * y0 + x1 * y1 + x2 * y2;
+	if (!Number.isFinite(lambdaMax) || lambdaMax <= 0) {
+		return 1;
+	}
+
+	return Math.min(1, 1 / Math.sqrt(lambdaMax));
+}
+
 /**
  * Flattens parsed IR into a form suitable for rendering: a list of primitive leaves with world-space inverse matrices, 
  * and a single RPN token stream encoding the CSG tree.
@@ -450,13 +490,14 @@ export function flattenIR(ir: ParsedIR): { leaves: FlatLeaf[]; tokens: FlatToken
 			const p0 = prim.params[0] ?? 1;
 			const p1 = prim.params[1] ?? 1;
 			const p2 = prim.params[2] ?? 1;
+			const stepScale = estimateConservativeStepScale(currentInv);
 
 			const leafIndex = leaves.length;
 			// determine leaf color: inheritedColor overrides primitive's declared color
 			const primColor: [number, number, number, number] | null = prim.color ? [prim.color[0], prim.color[1], prim.color[2], 0.0] : null;
 			const defaultColor: [number, number, number, number] = [0.6, 0.6, 0.6, 0.0];
 			const color: [number, number, number, number] = inheritedColor ?? primColor ?? defaultColor;
-			leaves.push({ kind, params: [p0, p1, p2, 0], inv: currentInv, color });
+			leaves.push({ kind, params: [p0, p1, p2, stepScale], inv: currentInv, color });
 			// estimate world-space bounding radius for this primitive using currentFwd
 			// forward matrix stores translation in indices 3,7,11
 			const cx = currentFwd[3];

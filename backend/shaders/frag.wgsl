@@ -117,27 +117,28 @@ fn sdfOctahedron(p: vec3f, size: f32) -> f32 {
 fn sdfLeaf(idx: u32, p: vec3f) -> f32 {
   let leaf = leaves[idx];
   let lp = applyInv(leaf, p);
+  let marchScale = max(leaf.params.w, 0.0);
   switch leaf.kind {
     case 0u: {
-      return sdfSphere(lp, leaf.params.x);
+      return sdfSphere(lp, leaf.params.x) * marchScale;
     }
     case 1u: {
-      return sdfCube(lp, leaf.params.x);
+      return sdfCube(lp, leaf.params.x) * marchScale;
     }
     case 2u: {
-      return sdfCylinder(lp, leaf.params.x, leaf.params.y);
+      return sdfCylinder(lp, leaf.params.x, leaf.params.y) * marchScale;
     }
     case 3u: {
-      return sdfPyramid(lp, leaf.params.x, leaf.params.y);
+      return sdfPyramid(lp, leaf.params.x, leaf.params.y) * marchScale;
     }
     case 4u: {
-      return sdfCone(lp, leaf.params.x, leaf.params.y);
+      return sdfCone(lp, leaf.params.x, leaf.params.y) * marchScale;
     }
     case 5u: {
-      return sdfTorus(lp, leaf.params.x, leaf.params.y);
+      return sdfTorus(lp, leaf.params.x, leaf.params.y) * marchScale;
     }
     case 6u: {
-      return sdfOctahedron(lp, leaf.params.x);
+      return sdfOctahedron(lp, leaf.params.x) * marchScale;
     }
     default: {
       return 1e6;
