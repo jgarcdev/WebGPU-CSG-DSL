@@ -1,0 +1,36 @@
+let floor = scale(
+  Cube(2),
+  1, 0.2, 1
+);
+
+let mainBase = color(difference(
+  translate(Sphere(0.3), 0, 0.3, 0),
+  translate(Cube(0.6), 0, 0.86, 0)
+), 100, 1, 2);
+
+let tunnel = color(translate(Torus(0.8, 0.05), 0, 0.23, 0), 0, 30, 60);
+
+let miniBase0 = translate(Sphere(0.1), -0.8, 0.28, 0); // -x,.,0
+let miniBase1 = translate(Sphere(0.1), 0.8, 0.28, 0); // x,.,0
+let miniBase2 = translate(Sphere(0.1), 0, 0.28, -0.8); // 0,.,-z
+let miniBase3 = translate(Sphere(0.1), 0, 0.28, 0.8); // 0,.,z
+
+// Constructing a single lunar base
+
+let miniBases = color(union(
+  union(
+    union(
+      miniBase0,
+      miniBase1
+    ),
+    miniBase2
+  ),
+  miniBase3
+), 50, 10, 45);
+
+let sideBases = union(miniBases, tunnel);
+
+let base = union(sideBases, mainBase);
+
+let lunarBase = union(base, floor);
+Render(lunarBase);

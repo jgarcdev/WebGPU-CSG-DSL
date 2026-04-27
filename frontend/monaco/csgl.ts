@@ -32,7 +32,6 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
     keywords: [
       "let", "const"
     ],
-    // Recognize constructors / primitive names (capitalized)
     primitives: ["Sphere", "Cube", "Cylinder", "Pyramid", "Cone", "Torus", "Octahedron"],
     tokenizer: {
       root: [

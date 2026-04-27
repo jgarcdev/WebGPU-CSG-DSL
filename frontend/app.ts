@@ -69,7 +69,7 @@ if (btnClear) {
       // Try to clear 2D rendering on the canvas
       const ctx2 = canvas.getContext('2d');
       if (ctx2) ctx2.clearRect(0, 0, canvas.width, canvas.height);
-      else canvas.width = canvas.width;
+      // else canvas.width = canvas.width;
 
       if (status) status.textContent = '';
     } catch (e) {
@@ -138,7 +138,7 @@ btnRun.addEventListener('click', async () => {
   status.textContent = 'Running';
   try {
     // Default IR is read from default.csgir
-    const defaultIR = await fetch('/frontend/default.csgir').then((resp) => {
+    const defaultIR = await fetch('/frontend/sample.csgir').then((resp) => {
       if (!resp.ok) throw new Error(`Failed to load default IR: ${resp.statusText}`);
       return resp.text();
     });
@@ -181,20 +181,6 @@ btnRun.addEventListener('click', async () => {
   }
 });
 
-// // live checkbox handler: update renderer without re-running
-// if (chkAxes) {
-//   chkAxes.addEventListener('change', () => {
-//     const val = chkAxes.checked;
-//     try {
-//       if (runtimeController && typeof runtimeController.setShowAxes === 'function') {
-//         runtimeController.setShowAxes(val);
-//       }
-//     } catch (e) {
-//       appendLog('Failed to update showAxes at runtime', String(e));
-//     }
-//   });
-// }
-
 function waitForRequire(timeout = 3000) {
   return new Promise<void>((resolve, reject) => {
     const start = performance.now();
@@ -208,8 +194,8 @@ function waitForRequire(timeout = 3000) {
 }
 
 // --- Camera / interaction controller (lightweight, CPU-side) ---
-let camPos = { x: 0, y: 0, z: 5 };
-let camTarget = { x: 0, y: 0, z: 0 };
+const camPos = { x: 0, y: 0, z: 5 };
+const camTarget = { x: 0, y: 0, z: 0 };
 let camFocal = 1.8;
 let camYaw = 0;
 let camPitch = 0;
@@ -298,7 +284,7 @@ canvas.addEventListener('pointerdown', (e) => {
         camTarget.y = camTarget.y * 0.85 + candidate[1] * 0.15;
         camTarget.z = camTarget.z * 0.85 + candidate[2] * 0.15;
         updateCameraToRenderer();
-      } catch (_) {}
+      } catch (_) {/* */}
     }
   }
 });
@@ -451,12 +437,12 @@ async function initMonacoEditor() {
       }
 
       // try to load the workspace script as the initial editor content
-      let initial = `// New script.csgl (empty)`;
+      let initial = `Render(Circle(1.0))`;
       try {
-        const resp = await fetch('/frontend/script.csgl');
+        const resp = await fetch('/frontend/sample.csgl');
         if (resp.ok) initial = await resp.text();
       } catch (_) {
-        appendLog('Could not load /frontend/script.csgl, using fallback');
+        appendLog('Could not load /frontend/sample.csgl, using fallback');
       }
 
       monacoEditor = monaco.editor.create(editorHost, {

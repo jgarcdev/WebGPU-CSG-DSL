@@ -3,7 +3,7 @@ import {
 	NumberLiteralNode, CallExpressionNode, BinaryExpressionNode
 } from './ast.ts';
 
-const CSGIR_VERSION = "0.1.0";
+const CSGIR_VERSION = "0.0.1";
 
 
 function matIdentity(): number[] {

@@ -2,9 +2,9 @@
 
 To render an object:
 ```
-let object = ...
+let object = ...;
 
-Render(object)
+Render(object);
 ```
 
 Comments:
@@ -40,9 +40,13 @@ Object
 - `Octahedron(size) -> OctahedronObject`
 
 ```
-let sphere = Sphere(1.2)
-let cube = Cube(2.0)
-let cylinder = Cylinder(0.5, 3.0)
+let sphere = Sphere(1.2);
+let cube = Cube(2.0);
+let cylinder = Cylinder(0.5, 3.0);
+let pyramid = Pyramid(1.0, 2.0);
+let cone = Cone(0.5, 2.0);
+let torus = Torus(1.0, 0.3);
+let octahedron = Octahedron(1.5);
 ```
 
 ## Transformations
@@ -81,8 +85,6 @@ let complexObject = union(
 
 - `color(obj, r, g, b) -> ColoredObject`
 	- RGB between 0 and 255
-
-
 
 
 ## CSG-IR
@@ -196,8 +198,9 @@ Primitive[
 
 ## Self-Notes
 
-Future if time allows:
-- Function that applies a preset transformation/operation to objects
+Metaprogramming (future)
+
+- Functions that applies a preset transformation/operation to objects
 	- Only "return" type is an object
 		- Only return statement is the last line of the function
 Ie:
@@ -214,5 +217,4 @@ let ...;
 let water = H2O(oxygen, hydrogen1, hydrogen2)
 ```
 
-- Metaprogramming??
-	- Allow functions and loops that generates code at compile time
+- Loops and if-statements that generate code at compile time
