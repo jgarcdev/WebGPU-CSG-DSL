@@ -135,7 +135,7 @@ export async function webgpuMain(canvas: HTMLCanvasElement, irCode: string, onLo
   }
 
   const flattened = flattenIR(ir);
-  // Diagnostic: log per-leaf color values to help debug color propagation
+
   for (let i = 0; i < flattened.leaves.length; i++) {
     const lf = flattened.leaves[i];
     onLog?.(`Leaf[${i}] color = ${lf.color[0].toFixed(6)}, ${lf.color[1].toFixed(6)}, ${lf.color[2].toFixed(6)}, ${lf.color[3].toFixed(6)}`);

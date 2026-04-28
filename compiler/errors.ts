@@ -22,7 +22,7 @@ export class ParserError extends CompilerError {
 export class SemanticError extends CompilerError {
   constructor(message: string, line: number, column: number) {
     super(message, line, column);
-    this.name = 'SemanticError';
+    this.name = "SemanticError";
   }
 }
 

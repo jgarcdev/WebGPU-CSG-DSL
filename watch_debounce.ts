@@ -12,7 +12,7 @@ if (args.length === 0) {
 if (args[0] === "--") args.shift();
 
 if (args.length === 0) {
-  console.error("No command provided after '--'");
+  console.error("No command provided after "--"");
   Deno.exit(2);
 }
 
@@ -57,7 +57,7 @@ async function restart() {
   child = spawnCmd(args);
 }
 
-console.log(`[watch] watching ${WATCH_PATHS.join(", ")} (debounce ${DEBOUNCE_MS}ms) — running: ${args.join(" ")}`);
+console.log(`[watch] watching ${WATCH_PATHS.join(", ")} (debounce ${DEBOUNCE_MS}ms) — running: ${args.join(' ')}`);
 
 for await (const event of Deno.watchFs(WATCH_PATHS)) {
   // ignore empty events

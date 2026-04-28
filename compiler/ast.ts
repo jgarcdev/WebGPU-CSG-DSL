@@ -1,5 +1,5 @@
 export type ProgramNode = {
-  type: 'Program';
+  type: "Program";
   statements: StatementNode[];
 };
 
@@ -10,29 +10,29 @@ export type StatementNode =
   | ExpressionStatementNode;
 
 export type LetStatementNode = {
-  type: 'LetStatement';
+  type: "LetStatement";
   name: IdentifierNode;
   value: ExpressionNode;
 };
 
 export type RenderStatementNode = {
-  type: 'RenderStatement';
+  type: "RenderStatement";
   argument: ExpressionNode;
 };
 
 export type ExpressionStatementNode = {
-  type: 'ExpressionStatement';
+  type: "ExpressionStatement";
   expression: ExpressionNode;
 };
 
 export type ConstDeclarationNode = {
-  type: 'ConstDeclaration';
+  type: "ConstDeclaration";
   name: string;
   value: ExpressionNode;
 };
 
 export type ConstBlockNode = {
-  type: 'ConstBlock';
+  type: "ConstBlock";
   decls: ConstDeclarationNode[];
 };
 
@@ -43,27 +43,25 @@ export type ExpressionNode =
   | BinaryExpressionNode;
 
 export type BinaryExpressionNode = {
-  type: 'BinaryExpression';
+  type: "BinaryExpression";
   operator: '+' | '-' | '*' | '/';
   left: ExpressionNode;
   right: ExpressionNode;
 };
 
 export type IdentifierNode = {
-  type: 'Identifier';
+  type: "Identifier";
   name: string;
 };
 
 export type NumberLiteralNode = {
-  type: 'NumberLiteral';
+  type: "NumberLiteral";
   raw: string;
   value: number;
 };
 
 export type CallExpressionNode = {
-  type: 'CallExpression';
+  type: "CallExpression";
   callee: IdentifierNode;
   args: ExpressionNode[];
 };
-
-export { };

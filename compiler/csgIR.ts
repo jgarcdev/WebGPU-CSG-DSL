@@ -1,7 +1,8 @@
 import { 
 	ProgramNode, LetStatementNode, RenderStatementNode, ExpressionNode, IdentifierNode, 
 	NumberLiteralNode, CallExpressionNode, BinaryExpressionNode
-} from './ast.ts';
+} from "./ast.ts";
+
 
 const CSGIR_VERSION = "0.0.1";
 
@@ -65,8 +66,8 @@ function fmtNum(n: number): string {
 }
 
 function evaluateNumericExpression(expr: ExpressionNode): number {
-	if (expr.type === 'NumberLiteral') return (expr as NumberLiteralNode).value;
-	if (expr.type === 'BinaryExpression') {
+	if (expr.type === "NumberLiteral") return (expr as NumberLiteralNode).value;
+	if (expr.type === "BinaryExpression") {
 		const b = expr as BinaryExpressionNode;
 		const l = evaluateNumericExpression(b.left);
 		const r = evaluateNumericExpression(b.right);
@@ -77,7 +78,7 @@ function evaluateNumericExpression(expr: ExpressionNode): number {
 			case '/': return l / r;
 		}
 	}
-	throw new Error('Expected numeric expression');
+	throw new Error("Expected numeric expression");
 }
 
 export function lowerIR(ast: ProgramNode): string {
@@ -91,13 +92,13 @@ export function lowerIR(ast: ProgramNode): string {
 	const env = new Map<string,string>();
 
 	function exprToRef(expr: ExpressionNode): string {
-		if (expr.type === 'Identifier') {
+		if (expr.type === "Identifier") {
 			const name = (expr as IdentifierNode).name;
 			const r = env.get(name);
 			if (!r) throw new Error(`Lowering: unknown identifier ${name}`);
 			return r;
 		}
-		if (expr.type === 'CallExpression') {
+		if (expr.type === "CallExpression") {
 			const call = expr as CallExpressionNode;
 			const callee = call.callee.name;
 			const isCapitalized = /^[A-Z]/.test(callee);
@@ -106,18 +107,18 @@ export function lowerIR(ast: ProgramNode): string {
 			if (isCapitalized) {
 				// primitives: allow numeric expressions (NumberLiteral or BinaryExpression)
 				const args = call.args.map(a => {
-					if (a.type === 'NumberLiteral') return (a as NumberLiteralNode).raw;
-					if (a.type === 'BinaryExpression') return fmtNum(evaluateNumericExpression(a));
-					throw new Error('primitive args must be numeric expressions');
+					if (a.type === "NumberLiteral") return (a as NumberLiteralNode).raw;
+					if (a.type === "BinaryExpression") return fmtNum(evaluateNumericExpression(a));
+					throw new Error("primitive args must be numeric expressions");
 				});
-				const entry = `${callee}[${args.join(', ')}]`;
+				const entry = `${callee}[${args.join(", ")}]`;
 				const idx = primitives.length;
 				primitives.push(entry);
 				return `p.${idx}`;
 			}
 
 			if (isLower) {
-				if (callee === 'translate' || callee === 'scale' || callee === 'rotate') {
+				if (callee === "translate" || callee === "scale" || callee === "rotate") {
 					// first arg is object
 					const parent = call.args[0];
 					const parentRef = exprToRef(parent as ExpressionNode);
@@ -127,9 +128,9 @@ export function lowerIR(ast: ProgramNode): string {
 					const a3 = evaluateNumericExpression(call.args[3]);
 
 					let M = matIdentity();
-					if (callee === 'translate') M = matTranslate(a1, a2, a3);
-					else if (callee === 'scale') M = matScale(a1, a2, a3);
-					else if (callee === 'rotate') {
+					if (callee === "translate") M = matTranslate(a1, a2, a3);
+					else if (callee === "scale") M = matScale(a1, a2, a3);
+					else if (callee === "rotate") {
 						const rx = matRotateX(a1);
 						const ry = matRotateY(a2);
 						const rz = matRotateZ(a3);
@@ -137,23 +138,23 @@ export function lowerIR(ast: ProgramNode): string {
 						M = matMul(matMul(ry, rx), rz);
 					}
 
-					const entries = M.map(fmtNum).join(', ');
+					const entries = M.map(fmtNum).join(", ");
 					const entry = `${parentRef}[${entries}]`;
 					const idx = transformations.length;
 					transformations.push(entry);
 					return `t.${idx}`;
 				}
 
-				if (callee === 'union' || callee === 'difference' || callee === 'intersection') {
+				if (callee === "union" || callee === "difference" || callee === "intersection") {
 					const a0 = exprToRef(call.args[0]);
 					const a1 = exprToRef(call.args[1]);
-					const type = (callee === 'intersection') ? 'Intersection' : (callee[0].toUpperCase() + callee.slice(1));
+					const type = (callee === "intersection") ? "Intersection" : (callee[0].toUpperCase() + callee.slice(1));
 					const entry = `${type}[${a0}, ${a1}]`;
 					const idx = csg.length;
 					csg.push(entry);
 					return `c.${idx}`;
 				}
-				if (callee === 'color') {
+				if (callee === "color") {
 					// color(obj, r, g, b) -> attach attribute to obj ref
 					const objRef = exprToRef(call.args[0]);
 					const r = evaluateNumericExpression(call.args[1]);
@@ -169,22 +170,22 @@ export function lowerIR(ast: ProgramNode): string {
 
 			throw new Error(`Lowering: unsupported call ${call.callee.name}`);
 		}
-		throw new Error('Lowering: unexpected expression node');
+		throw new Error("Lowering: unexpected expression node");
 	}
 
 	for (const stmt of ast.statements) {
-		if (stmt.type === 'LetStatement') {
+		if (stmt.type === "LetStatement") {
 			const s = stmt as LetStatementNode;
 			const ref = exprToRef(s.value);
 			env.set(s.name.name, ref);
-		} else if (stmt.type === 'RenderStatement') {
+		} else if (stmt.type === "RenderStatement") {
 			const s = stmt as RenderStatementNode;
 			const ref = exprToRef(s.argument);
 			renders.push(ref);
-		} else if (stmt.type === 'ConstBlock') {
+		} else if (stmt.type === "ConstBlock") {
 			// already handled by earlier semantic pass; ignore in lowering
 			continue;
-		} else if (stmt.type === 'ExpressionStatement') {
+		} else if (stmt.type === "ExpressionStatement") {
 			// top-level expression: lower it for side-effects (primitives, transforms, attributes)
 			const expr = stmt.expression as ExpressionNode;
 			try {
@@ -194,7 +195,7 @@ export function lowerIR(ast: ProgramNode): string {
 			}
 			continue;
 		} else {
-			throw new Error('Lowering: unexpected statement node');
+			throw new Error("Lowering: unexpected statement node");
 		}
 	}
 
@@ -203,46 +204,44 @@ export function lowerIR(ast: ProgramNode): string {
 	lines.push(`[${CSGIR_VERSION}]`);
 	lines.push('[');
 	// Renders
-	lines.push('\tRenders[' + (renders.map(r => r).join(', ') ) + ']');
+	lines.push("\tRenders[" + (renders.map(r => r).join(", ") ) + ']');
 	// Primitives (with optional attributes)
-	lines.push('\tPrimitives[');
+	lines.push("\tPrimitives[");
 	for (let i = 0; i < primitives.length; i++) {
 		const p = primitives[i];
 		const ref = `p.${i}`;
 		const attrs = attributes.get(ref);
 		if (attrs && attrs.length > 0) {
-			lines.push('\t\t' + p + ' { ' + attrs.join(', ') + ' }');
+			lines.push("\t\t" + p + " { " + attrs.join(", ") + " }");
 		} else {
-			lines.push('\t\t' + p);
+			lines.push("\t\t" + p);
 		}
 	}
-	lines.push('\t]');
+	lines.push("\t]");
 	// Transformations
-	lines.push('\tTransformations[');
+	lines.push("\tTransformations[");
 	for (let i = 0; i < transformations.length; i++) {
 		const t = transformations[i];
 		const ref = `t.${i}`;
 		const attrsT = attributes.get(ref);
-		if (attrsT && attrsT.length > 0) lines.push('\t\t' + t + ' { ' + attrsT.join(', ') + ' }');
-		else lines.push('\t\t' + t);
+		if (attrsT && attrsT.length > 0) lines.push("\t\t" + t + " { " + attrsT.join(", ") + " }");
+		else lines.push("\t\t" + t);
 	}
-	lines.push('\t]');
+	lines.push("\t]");
 	// CSG
-	// CSG
-	lines.push('\tCSG[');
+	lines.push("\tCSG[");
 	for (let i = 0; i < csg.length; i++) {
 		const c = csg[i];
 		const ref = `c.${i}`;
 		const attrsC = attributes.get(ref);
-		if (attrsC && attrsC.length > 0) lines.push('\t\t' + c + ' { ' + attrsC.join(', ') + ' }');
-		else lines.push('\t\t' + c);
+		if (attrsC && attrsC.length > 0) lines.push("\t\t" + c + " { " + attrsC.join(", ") + " }");
+		else lines.push("\t\t" + c);
 	}
-	lines.push('\t]');
+	lines.push("\t]");
 	lines.push(']');
 
 	return lines.join('\n');
 }
-
 
 
 export function optimizeIR(ir: string): string {
@@ -276,7 +275,7 @@ export function optimizeIR(ir: string): string {
 				if (depth === 0) return i;
 			}
 		}
-		fail('unterminated bracketed block');
+		fail("unterminated bracketed block");
 	}
 
 	function findMatchingBrace(input: string, openIndex: number): number {
@@ -289,7 +288,7 @@ export function optimizeIR(ir: string): string {
 				if (depth === 0) return i;
 			}
 		}
-		fail('unterminated brace block');
+		fail("unterminated brace block");
 	}
 
 	function parseBlock(input: string, openIndex: number): { content: string; nextIndex: number } {
@@ -303,7 +302,7 @@ export function optimizeIR(ir: string): string {
 	function parseRef(raw: string): Ref {
 		const text = raw.trim();
 		const m = /^([ptc])\.(\d+)$/.exec(text);
-		if (!m) fail(`invalid reference '${text}'`);
+		if (!m) fail(`invalid reference "${text}"`);
 		return { kind: m[1] as RefKind, index: Number(m[2]), raw: text };
 	}
 
@@ -316,14 +315,14 @@ export function optimizeIR(ir: string): string {
 		if (!text) return [];
 		return text.split(',').map((x) => x.trim()).filter((x) => x.length > 0).map((x) => {
 			const n = Number(x);
-			if (!Number.isFinite(n)) fail(`invalid number '${x}'`);
+			if (!Number.isFinite(n)) fail(`invalid number "${x}"`);
 			return n;
 		});
 	}
 
 	function splitTopLevelItems(s: string): string[] {
 		const out: string[] = [];
-		let buf = '';
+		let buf = "";
 		let depth = 0;
 		for (let i = 0; i < s.length; i++) {
 			const ch = s[i];
@@ -339,7 +338,7 @@ export function optimizeIR(ir: string): string {
 			}
 			if (ch === ',' && depth === 0) {
 				if (buf.trim().length > 0) out.push(buf.trim());
-				buf = '';
+				buf = "";
 				continue;
 			}
 			buf += ch;
@@ -361,10 +360,10 @@ export function optimizeIR(ir: string): string {
 			}
 
 			const open = sectionContent.indexOf('[', i);
-			if (open === -1) fail(`missing '[' for section entry near '${sectionContent.slice(i).trim()}'`);
+			if (open === -1) fail(`missing '[' for section entry near "${sectionContent.slice(i).trim()}"`);
 
 			const head = sectionContent.slice(i, open).trim();
-			if (!head) fail('empty section entry head');
+			if (!head) fail("empty section entry head");
 
 			const close = findMatchingBracket(sectionContent, open);
 			const payload = sectionContent.slice(open + 1, close);
@@ -388,16 +387,16 @@ export function optimizeIR(ir: string): string {
 
 	function parseRequiredSection(programBody: string, sectionName: string, cursor: number): { content: string; nextCursor: number } {
 		const start = programBody.indexOf(sectionName, cursor);
-		if (start === -1) fail(`missing required section '${sectionName}'`);
+		if (start === -1) fail(`missing required section "${sectionName}"`);
 
 		const between = programBody.slice(cursor, start).trim();
 		if (between.length > 0) {
-			fail(`unexpected tokens before section '${sectionName}': '${between}'`);
+			fail(`unexpected tokens before section "${sectionName}": "${between}"`);
 		}
 
 		let open = start + sectionName.length;
 		open = skipWs(programBody, open);
-		if (programBody[open] !== '[') fail(`section '${sectionName}' must be followed by '['`);
+		if (programBody[open] !== '[') fail(`section "${sectionName}" must be followed by '['`);
 
 		const block = parseBlock(programBody, open);
 		return { content: block.content, nextCursor: block.nextIndex };
@@ -423,13 +422,13 @@ export function optimizeIR(ir: string): string {
 	const firstText = firstBlock.content.trim();
 
 	let version: string | null = null;
-	let programBody = '';
+	let programBody = "";
 	let tailIndex = firstBlock.nextIndex;
 
 	if (/^\d+\.\d+\.\d+$/.test(firstText)) {
 		version = firstText;
 		i = skipWs(input, firstBlock.nextIndex);
-		if (input[i] !== '[') fail('expected program block after version block');
+		if (input[i] !== '[') fail("expected program block after version block");
 		const programBlock = parseBlock(input, i);
 		programBody = programBlock.content;
 		tailIndex = programBlock.nextIndex;
@@ -438,20 +437,20 @@ export function optimizeIR(ir: string): string {
 	}
 
 	if (input.slice(tailIndex).trim().length > 0) {
-		fail('unexpected trailing tokens after program block');
+		fail("unexpected trailing tokens after program block");
 	}
 
 	let cursor = 0;
-	const rendersSection = parseRequiredSection(programBody, 'Renders', cursor);
+	const rendersSection = parseRequiredSection(programBody, "Renders", cursor);
 	cursor = rendersSection.nextCursor;
-	const primitivesSection = parseRequiredSection(programBody, 'Primitives', cursor);
+	const primitivesSection = parseRequiredSection(programBody, "Primitives", cursor);
 	cursor = primitivesSection.nextCursor;
-	const transformationsSection = parseRequiredSection(programBody, 'Transformations', cursor);
+	const transformationsSection = parseRequiredSection(programBody, "Transformations", cursor);
 	cursor = transformationsSection.nextCursor;
-	const csgSection = parseRequiredSection(programBody, 'CSG', cursor);
+	const csgSection = parseRequiredSection(programBody, "CSG", cursor);
 	cursor = csgSection.nextCursor;
 	if (programBody.slice(cursor).trim().length > 0) {
-		fail(`unexpected tokens after CSG section: '${programBody.slice(cursor).trim()}'`);
+		fail(`unexpected tokens after CSG section: "${programBody.slice(cursor).trim()}"`);
 	}
 
 	const renders: Ref[] = splitTopLevelItems(rendersSection.content).map(parseRef);
@@ -466,13 +465,13 @@ export function optimizeIR(ir: string): string {
 	}));
 
 	for (const t of oldTransforms) {
-		if (t.matrix.length !== 16) fail(`transformation '${refToString(t.source)}' must contain exactly 16 matrix values`);
+		if (t.matrix.length !== 16) fail(`transformation "${refToString(t.source)}" must contain exactly 16 matrix values`);
 	}
 
 	const csgEntries = parseEntryBlocks(csgSection.content);
 	const oldCsg: CsgEntry[] = csgEntries.map((e) => {
 		const refs = splitTopLevelItems(e.payload).map(parseRef);
-		if (refs.length !== 2) fail(`CSG op '${e.head}' must contain exactly 2 object references`);
+		if (refs.length !== 2) fail(`CSG op "${e.head}" must contain exactly 2 object references`);
 		return { op: e.head, left: refs[0], right: refs[1], attrs: e.attrs };
 	});
 
@@ -484,7 +483,7 @@ export function optimizeIR(ir: string): string {
 
 	function internTransform(entry: TransformEntry): Ref {
 		const matrixKey = entry.matrix.map(fmtNum).join(',');
-		const key = `${refKey(entry.source)}|${matrixKey}|${entry.attrs.join('||')}`;
+		const key = `${refKey(entry.source)}|${matrixKey}|${entry.attrs.join("||")}`;
 		const existing = transformIntern.get(key);
 		if (existing !== undefined) return { kind: 't', index: existing };
 		const idx = newTransforms.length;
@@ -494,7 +493,7 @@ export function optimizeIR(ir: string): string {
 	}
 
 	function internCsg(entry: CsgEntry): Ref {
-		const key = `${entry.op}|${refKey(entry.left)}|${refKey(entry.right)}|${entry.attrs.join('||')}`;
+		const key = `${entry.op}|${refKey(entry.left)}|${refKey(entry.right)}|${entry.attrs.join("||")}`;
 		const existing = csgIntern.get(key);
 		if (existing !== undefined) return { kind: 'c', index: existing };
 		const idx = newCsg.length;
@@ -516,7 +515,7 @@ export function optimizeIR(ir: string): string {
 
 		if (ref.kind === 't') {
 			const tr = oldTransforms[ref.index];
-			if (!tr) fail(`reference '${memoKey}' out of range for Transformations`);
+			if (!tr) fail(`reference "${memoKey}" out of range for Transformations`);
 			const sourceOpt = optimizeRef(tr.source);
 			let collapsedSource = sourceOpt;
 			let collapsedMatrix = tr.matrix.slice();
@@ -524,7 +523,7 @@ export function optimizeIR(ir: string): string {
 
 			if (sourceOpt.kind === 't') {
 				const parent = newTransforms[sourceOpt.index];
-				if (!parent) fail(`optimized transformation '${refKey(sourceOpt)}' missing`);
+				if (!parent) fail(`optimized transformation "${refKey(sourceOpt)}" missing`);
 				collapsedSource = parent.source;
 				collapsedMatrix = matMul(collapsedMatrix, parent.matrix);
 				collapsedAttrs = mergeAttrs(collapsedAttrs, parent.attrs);
@@ -540,7 +539,7 @@ export function optimizeIR(ir: string): string {
 		}
 
 		const node = oldCsg[ref.index];
-		if (!node) fail(`reference '${memoKey}' out of range for CSG`);
+		if (!node) fail(`reference "${memoKey}" out of range for CSG`);
 		const left = optimizeRef(node.left);
 		const right = optimizeRef(node.right);
 		const out = internCsg({ op: node.op, left, right, attrs: node.attrs.slice() });
@@ -558,7 +557,7 @@ export function optimizeIR(ir: string): string {
 			if (usedTransforms.has(ref.index)) return;
 			usedTransforms.add(ref.index);
 			const t = newTransforms[ref.index];
-			if (!t) fail(`optimized reference '${refToString(ref)}' out of range`);
+			if (!t) fail(`optimized reference "${refToString(ref)}" out of range`);
 			markUsed(t.source);
 			return;
 		}
@@ -566,7 +565,7 @@ export function optimizeIR(ir: string): string {
 			if (usedCsg.has(ref.index)) return;
 			usedCsg.add(ref.index);
 			const c = newCsg[ref.index];
-			if (!c) fail(`optimized reference '${refToString(ref)}' out of range`);
+			if (!c) fail(`optimized reference "${refToString(ref)}" out of range`);
 			markUsed(c.left);
 			markUsed(c.right);
 		}
@@ -594,11 +593,11 @@ export function optimizeIR(ir: string): string {
 		if (ref.kind === 'p') return ref;
 		if (ref.kind === 't') {
 			const mapped = tIndexMap.get(ref.index);
-			if (mapped === undefined) fail(`missing remap for '${refToString(ref)}'`);
+			if (mapped === undefined) fail(`missing remap for "${refToString(ref)}"`);
 			return { kind: 't', index: mapped };
 		}
 		const mapped = cIndexMap.get(ref.index);
-		if (mapped === undefined) fail(`missing remap for '${refToString(ref)}'`);
+		if (mapped === undefined) fail(`missing remap for "${refToString(ref)}"`);
 		return { kind: 'c', index: mapped };
 	}
 
@@ -614,29 +613,29 @@ export function optimizeIR(ir: string): string {
 	const lines: string[] = [];
 	if (version) lines.push(`[${version}]`);
 	lines.push('[');
-	lines.push('\tRenders[' + finalRenders.map(refToString).join(', ') + ']');
+	lines.push("\tRenders[" + finalRenders.map(refToString).join(", ") + ']');
 
-	lines.push('\tPrimitives[');
+	lines.push("\tPrimitives[");
 	for (const p of primitives) {
-		const attrs = p.attrs.length > 0 ? ` { ${p.attrs.join(', ')} }` : '';
+		const attrs = p.attrs.length > 0 ? ` { ${p.attrs.join(", ")} }` : "";
 		lines.push(`\t\t${p.head}[${p.payload}]${attrs}`);
 	}
-	lines.push('\t]');
+	lines.push("\t]");
 
-	lines.push('\tTransformations[');
+	lines.push("\tTransformations[");
 	for (const t of finalTransforms) {
-		const matrix = t.matrix.map(fmtNum).join(', ');
-		const attrs = t.attrs.length > 0 ? ` { ${t.attrs.join(', ')} }` : '';
+		const matrix = t.matrix.map(fmtNum).join(", ");
+		const attrs = t.attrs.length > 0 ? ` { ${t.attrs.join(", ")} }` : "";
 		lines.push(`\t\t${refToString(t.source)}[${matrix}]${attrs}`);
 	}
-	lines.push('\t]');
+	lines.push("\t]");
 
-	lines.push('\tCSG[');
+	lines.push("\tCSG[");
 	for (const c of finalCsg) {
-		const attrs = c.attrs.length > 0 ? ` { ${c.attrs.join(', ')} }` : '';
+		const attrs = c.attrs.length > 0 ? ` { ${c.attrs.join(", ")} }` : "";
 		lines.push(`\t\t${c.op}[${refToString(c.left)}, ${refToString(c.right)}]${attrs}`);
 	}
-	lines.push('\t]');
+	lines.push("\t]");
 	lines.push(']');
 
 	return lines.join('\n');

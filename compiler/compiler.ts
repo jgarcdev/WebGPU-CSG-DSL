@@ -13,7 +13,7 @@ import { Warnings } from "./warnings.ts";
  */
 export async function compile(source: string): Promise<{ ir: string, warnings: Warnings }> {
   try {
-    console.log('Compiling source code:\n', source);
+    console.log("Compiling source code:\n", source);
     const tokens = lex(source);
     const ast = parse(tokens);
     const { program, warnings } = sema(ast); 

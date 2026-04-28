@@ -1,34 +1,35 @@
 /// <reference lib="dom" />
 
-import { setupCSGLLanguage, MonacoLike } from './monaco/csgl.ts';
-import { webgpuMain } from '../backend/webgpu.ts';
+import { setupCSGLLanguage, MonacoLike } from "./monaco/csgl.ts";
+import { webgpuMain } from "../backend/webgpu.ts";
 import compile from "../compiler/compiler.ts";
 
-const editorHost = document.getElementById('editor-host') as HTMLDivElement;
-const btnCompile = document.getElementById('btn-compile') as HTMLButtonElement;
-const btnRun = document.getElementById('btn-run') as HTMLButtonElement;
-const btnClear = document.getElementById('btn-clear') as HTMLButtonElement | null;
-const status = document.getElementById('status') as HTMLSpanElement;
-const log = document.getElementById('log') as HTMLDivElement;
-const logEntries = document.getElementById('log-entries') as HTMLDivElement | null;
+
+const editorHost = document.getElementById("editor-host") as HTMLDivElement;
+const btnCompile = document.getElementById("btn-compile") as HTMLButtonElement;
+const btnRun = document.getElementById("btn-run") as HTMLButtonElement;
+const btnClear = document.getElementById("btn-clear") as HTMLButtonElement | null;
+const status = document.getElementById("status") as HTMLSpanElement;
+const log = document.getElementById("log") as HTMLDivElement;
+const logEntries = document.getElementById("log-entries") as HTMLDivElement | null;
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
-const gizmoCanvas = document.getElementById('gizmo') as HTMLCanvasElement | null;
-const chkAxes = document.getElementById('chk-axes') as HTMLInputElement | null;
+const gizmoCanvas = document.getElementById("gizmo") as HTMLCanvasElement | null;
+const chkAxes = document.getElementById("chk-axes") as HTMLInputElement | null;
 // initialize gizmo visibility from checkbox (works before run)
 if (gizmoCanvas && chkAxes) {
-  gizmoCanvas.style.display = chkAxes.checked ? 'block' : 'none';
+  gizmoCanvas.style.display = chkAxes.checked ? "block" : "none";
 }
 // wire checkbox to gizmo and runtime showAxes (if running)
 if (chkAxes) {
-  chkAxes.addEventListener('change', () => {
+  chkAxes.addEventListener("change", () => {
     const on = chkAxes.checked;
-    if (gizmoCanvas) gizmoCanvas.style.display = on ? 'block' : 'none';
+    if (gizmoCanvas) gizmoCanvas.style.display = on ? "block" : "none";
     try {
-      if (runtimeController && typeof runtimeController.setShowAxes === 'function') {
+      if (runtimeController && typeof runtimeController.setShowAxes === "function") {
         runtimeController.setShowAxes(on);
       }
     } catch (e) {
-      appendLog('Failed to update showAxes on runtime', String(e));
+      appendLog("Failed to update showAxes on runtime", String(e));
     }
     drawGizmo();
   });
@@ -44,7 +45,7 @@ let irCode: string | null = null;
 let runtimeController: any = null;
 
 function appendLog(...parts: unknown[]) {
-  const p = document.createElement('div');
+  const p = document.createElement("div");
   p.textContent = parts.map((v) => String(v)).join(' ');
   const target = logEntries ?? log;
   target.appendChild(p);
@@ -54,26 +55,26 @@ function appendLog(...parts: unknown[]) {
 }
 
 if (btnClear) {
-  btnClear.addEventListener('click', () => {
+  btnClear.addEventListener("click", () => {
     try {
       // Clear only the entries so the clear button remains in place
-      if (logEntries) logEntries.innerHTML = '';
+      if (logEntries) logEntries.innerHTML = "";
       else if (log) {
         // If no separated container exists, remove all children except the clear button
         for (let i = log.children.length - 1; i >= 0; i--) {
           const child = log.children[i];
-          if (child.id !== 'btn-clear') log.removeChild(child);
+          if (child.id !== "btn-clear") log.removeChild(child);
         }
       }
 
       // Try to clear 2D rendering on the canvas
-      const ctx2 = canvas.getContext('2d');
+      const ctx2 = canvas.getContext("2d");
       if (ctx2) ctx2.clearRect(0, 0, canvas.width, canvas.height);
       // else canvas.width = canvas.width;
 
-      if (status) status.textContent = '';
+      if (status) status.textContent = "";
     } catch (e) {
-      appendLog('Failed to clear output pane', String(e));
+      appendLog("Failed to clear output pane", String(e));
     }
   });
 }
@@ -81,22 +82,22 @@ if (btnClear) {
 function getSource() {
   if (monacoEditor) return monacoEditor.getValue();
   // fallback: no editor
-  return '';
+  return "";
 }
 
-btnCompile.addEventListener('click', async () => {
-  status.textContent = 'Compiling...';
+btnCompile.addEventListener("click", async () => {
+  status.textContent = "Compiling...";
   try {
     const { ir, warnings } = await compile(getSource());
-    appendLog('Compilation successful');
-    status.textContent = 'Compilation successful';
+    appendLog("Compilation successful");
+    status.textContent = "Compilation successful";
     irCode = ir;
     const allWarnings = warnings.all();
     if (allWarnings.length > 0) {
       appendLog(`Compilation completed with ${allWarnings.length} warning(s):`);
       allWarnings.forEach((w, i) => appendLog(`  ${i + 1}. ${w.message} (line ${w.line}, column ${w.column})`));
     } else {
-      appendLog('No warnings');
+      appendLog("No warnings");
     }
 
     // Show warnings in Monaco (markers + whole-line decorations) when available
@@ -112,38 +113,38 @@ btnCompile.addEventListener('click', async () => {
           endColumn: Math.max(1, (w.column || 1) + 1)
         }));
 
-        monacoNs.editor.setModelMarkers(model, 'csgl', markers);
+        monacoNs.editor.setModelMarkers(model, "csgl", markers);
 
         const newDecs = allWarnings.map((w) => ({
           range: new monacoNs.Range(Math.max(1, w.line || 1), 1, Math.max(1, w.line || 1), 1),
           options: {
             isWholeLine: true,
-            className: 'csglLineWarning',
+            className: "csglLineWarning",
             hoverMessage: { value: `⚠ ${w.message}` }
           }
         }));
 
         currentDecorationIds = monacoEditorInstance.deltaDecorations(currentDecorationIds, newDecs);
       } catch (e) {
-        appendLog('Failed to set Monaco warnings', String(e));
+        appendLog("Failed to set Monaco warnings", String(e));
       }
     }
   } catch (err) {
-    appendLog('Compilation error::', String(err));
-    status.textContent = 'Compilation error';
+    appendLog("Compilation error::", String(err));
+    status.textContent = "Compilation error";
   }
 });
 
-btnRun.addEventListener('click', async () => {
-  status.textContent = 'Running';
+btnRun.addEventListener("click", async () => {
+  status.textContent = "Running";
   try {
     // Default IR is read from default.csgir
-    const defaultIR = await fetch('/frontend/sample.csgir').then((resp) => {
+    const defaultIR = await fetch("/frontend/sample.csgir").then((resp) => {
       if (!resp.ok) throw new Error(`Failed to load default IR: ${resp.statusText}`);
       return resp.text();
     });
     const ir = irCode ? irCode : defaultIR;
-    const showAxes = (document.getElementById('chk-axes') as HTMLInputElement)?.checked ?? false;
+    const showAxes = (document.getElementById("chk-axes") as HTMLInputElement)?.checked ?? false;
     const controller = await webgpuMain(canvas, ir, (msg) => appendLog(msg), { showAxes });
     runtimeController = controller;
     // initialize frontend camera state from renderer
@@ -153,17 +154,17 @@ btnRun.addEventListener('click', async () => {
         initCameraFromRenderer(cam.pos, cam.target, cam.focal);
       }
     } catch (e) {
-      appendLog('Failed to get initial camera from renderer', String(e));
+      appendLog("Failed to get initial camera from renderer", String(e));
     }
   } catch (err) {
-    status.textContent = 'WebGPU error';
-    appendLog('WebGPU failed', String(err));
+    status.textContent = "WebGPU error";
+    appendLog("WebGPU failed", String(err));
     // fallback: simple 2D gradient to show output (get 2D context lazily)
     const w = canvas.width = 640;
     const h = canvas.height = 480;
-    const ctx2 = ctx ?? canvas.getContext('2d');
+    const ctx2 = ctx ?? canvas.getContext("2d");
     if (!ctx2) {
-      appendLog('2D context unavailable for fallback');
+      appendLog("2D context unavailable for fallback");
       return;
     }
     ctx = ctx2;
@@ -186,14 +187,14 @@ function waitForRequire(timeout = 3000) {
     const start = performance.now();
     function check() {
       if (globalThis.require != null) return resolve();
-      if (performance.now() - start > timeout) return reject(new Error('Monaco loader not available'));
+      if (performance.now() - start > timeout) return reject(new Error("Monaco loader not available"));
       setTimeout(check, 50);
     }
     check();
   });
 }
 
-// --- Camera / interaction controller (lightweight, CPU-side) ---
+// Camera/interaction controller
 const camPos = { x: 0, y: 0, z: 5 };
 const camTarget = { x: 0, y: 0, z: 0 };
 let camFocal = 1.8;
@@ -227,7 +228,7 @@ function scheduleCameraUpdate() {
     const y = ty + camDistance * Math.sin(camPitch);
     const z = tz + camDistance * Math.cos(camYaw) * Math.cos(camPitch);
     camPos.x = x; camPos.y = y; camPos.z = z;
-    if (runtimeController && typeof runtimeController.setCamera === 'function') {
+    if (runtimeController && typeof runtimeController.setCamera === "function") {
       runtimeController.setCamera([camPos.x, camPos.y, camPos.z], [camTarget.x, camTarget.y, camTarget.z], camFocal);
     }
     drawGizmo();
@@ -246,9 +247,9 @@ let lastX = 0;
 let lastY = 0;
 let pointerId: number | null = null;
 
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-canvas.addEventListener('pointerdown', (e) => {
+canvas.addEventListener("pointerdown", (e) => {
   canvas.setPointerCapture(e.pointerId);
   dragging = true;
   dragButton = e.button;
@@ -257,7 +258,7 @@ canvas.addEventListener('pointerdown', (e) => {
   lastY = e.clientY;
   if (e.button === 0) {
     // left: compute pivot candidate and softly move target toward it
-    if (runtimeController && typeof runtimeController.getCamera === 'function') {
+    if (runtimeController && typeof runtimeController.getCamera === "function") {
       try {
         const cam = runtimeController.getCamera();
         const ndcX = (e.offsetX / canvas.width) * 2 - 1;
@@ -289,7 +290,7 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 });
 
-canvas.addEventListener('pointermove', (e) => {
+canvas.addEventListener("pointermove", (e) => {
   if (!dragging || e.pointerId !== pointerId) return;
   const dx = e.clientX - lastX;
   const dy = e.clientY - lastY;
@@ -310,7 +311,7 @@ canvas.addEventListener('pointermove', (e) => {
   }
 });
 
-canvas.addEventListener('pointerup', (e) => {
+canvas.addEventListener("pointerup", (e) => {
   if (e.pointerId === pointerId) {
     dragging = false;
     dragButton = null;
@@ -318,7 +319,7 @@ canvas.addEventListener('pointerup', (e) => {
   }
 });
 
-canvas.addEventListener('pointercancel', (e) => {
+canvas.addEventListener("pointercancel", (e) => {
   if (e.pointerId === pointerId) {
     dragging = false;
     dragButton = null;
@@ -326,22 +327,21 @@ canvas.addEventListener('pointercancel', (e) => {
   }
 });
 
-// small math helpers
+
 function dot(a: number[], b: number[]) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 function cross(a: number[], b: number[]) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
 function lengthVec3(a: number[]) { return Math.hypot(a[0], a[1], a[2]); }
 function normalizeVec3(a: number[]) { const l = Math.max(1e-6, lengthVec3(a)); return [a[0]/l, a[1]/l, a[2]/l]; }
 
-// --- Gizmo drawing (CPU-side lightweight overlay) ---
 function drawGizmo() {
   if (!gizmoCanvas) return;
   // respect the checkbox: if axes hidden, clear and bail
   if (chkAxes && !chkAxes.checked) {
-    const ctxClear = gizmoCanvas.getContext('2d');
+    const ctxClear = gizmoCanvas.getContext("2d");
     if (ctxClear) ctxClear.clearRect(0,0,gizmoCanvas.width,gizmoCanvas.height);
     return;
   }
-  const ctx = gizmoCanvas.getContext('2d');
+  const ctx = gizmoCanvas.getContext("2d");
   if (!ctx) return;
   const w = gizmoCanvas.width;
   const h = gizmoCanvas.height;
@@ -360,7 +360,7 @@ function drawGizmo() {
   const up = normalizeVec3(cross(right, forward));
 
   // project each world axis into camera-local XY plane
-  const axes = [ {v:[1,0,0], color:'#ff6666', label:'X'}, {v:[0,1,0], color:'#66ff66', label:'Y'}, {v:[0,0,1], color:'#6ea0ff', label:'Z'} ];
+  const axes = [ {v:[1,0,0], color:"#ff6666", label:'X'}, {v:[0,1,0], color:"#66ff66", label:'Y'}, {v:[0,0,1], color:"#6ea0ff", label:'Z'} ];
   for (const a of axes) {
     const vx = dot(right, a.v);
     const vy = dot(up, a.v);
@@ -370,7 +370,7 @@ function drawGizmo() {
     ctx.lineTo(vx * size, -vy * size);
     ctx.strokeStyle = a.color;
     ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
+    ctx.lineCap = "round";
     ctx.stroke();
     // arrowhead
     ctx.beginPath();
@@ -380,20 +380,20 @@ function drawGizmo() {
     ctx.fillStyle = a.color;
     ctx.fill();
     // label
-    ctx.fillStyle = '#fff';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
+    ctx.fillStyle = "#fff";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
     ctx.fillText(a.label, tx + Math.sign(vx||1)*10, ty - Math.sign(vy||1)*10 + 4);
   }
 
   // center marker
-  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fillStyle='#eee'; ctx.fill();
+  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fillStyle="#eee"; ctx.fill();
   ctx.restore();
 }
 
 // clicking the gizmo resets the view to a default orientation
 if (gizmoCanvas) {
-  gizmoCanvas.addEventListener('click', () => {
+  gizmoCanvas.addEventListener("click", () => {
     // reset target to origin and orbit angles to defaults
     camTarget.x = 0; camTarget.y = 0; camTarget.z = 0;
     camYaw = 0; camPitch = 0;
@@ -422,33 +422,33 @@ async function initMonacoEditor() {
     };
 
     const reqRaw = (globalThis as unknown as { require?: unknown }).require;
-    if (!reqRaw) return appendLog('Monaco loader not found (require)');
-    if (typeof reqRaw !== 'function') return appendLog('Monaco loader found but is not callable');
+    if (!reqRaw) return appendLog("Monaco loader not found (require)");
+    if (typeof reqRaw !== "function") return appendLog("Monaco loader found but is not callable");
     const req = reqRaw as RequireLike;
-    if (!req.config) return appendLog('Monaco loader missing `config` method');
-    req.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.55.1/min/vs' } });
-    req(['vs/editor/editor.main'], async () => {
+    if (!req.config) return appendLog("Monaco loader missing `config` method");
+    req.config({ paths: { vs: "https://unpkg.com/monaco-editor@0.55.1/min/vs" } });
+    req(["vs/editor/editor.main"], async () => {
       const monaco = (globalThis as unknown as { monaco?: unknown }).monaco as MonacoLike | undefined;
-      if (!monaco) return appendLog('Monaco namespace not available');
+      if (!monaco) return appendLog("Monaco namespace not available");
       try {
         setupCSGLLanguage(monaco);
       } catch (e) {
-        appendLog('Language setup failed', String(e));
+        appendLog("Language setup failed", String(e));
       }
 
       // try to load the workspace script as the initial editor content
       let initial = `Render(Circle(1.0))`;
       try {
-        const resp = await fetch('/frontend/sample.csgl');
+        const resp = await fetch("/frontend/sample.csgl");
         if (resp.ok) initial = await resp.text();
       } catch (_) {
-        appendLog('Could not load /frontend/sample.csgl, using fallback');
+        appendLog("Could not load /frontend/sample.csgl, using fallback");
       }
 
       monacoEditor = monaco.editor.create(editorHost, {
         value: initial,
-        language: 'csgl',
-        theme: 'csglTheme',
+        language: "csgl",
+        theme: "csglTheme",
         automaticLayout: true,
         minimap: { enabled: false },
         fontSize: 14
@@ -457,10 +457,10 @@ async function initMonacoEditor() {
       monacoNs = monaco;
       monacoEditorInstance = monacoEditor;
 
-      appendLog('Monaco ready (CSGL)');
+      appendLog("Monaco ready (CSGL)");
     });
   } catch (err) {
-    appendLog('Monaco init error', String(err));
+    appendLog("Monaco init error", String(err));
   }
 }
 

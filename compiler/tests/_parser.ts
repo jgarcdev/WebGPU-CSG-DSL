@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from '@std/assert';
+import { assertEquals, assertThrows } from "@std/assert";
 import { lex } from "../lexer.ts";
 import { parse } from "../parser.ts";
 import * as AST from "../ast.ts";
@@ -11,16 +11,16 @@ Deno.test("Parse Let Primitives", () => {
 	const ast0 = parse(tokens0);
 
 	const expectedAST0: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'LetStatement',
-				name: { type: 'Identifier', name: 'sphere' },
+				type: "LetStatement",
+				name: { type: "Identifier", name: "sphere" },
 				value: {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: 'Sphere' },
+					type: "CallExpression",
+					callee: { type: "Identifier", name: "Sphere" },
 					args: [
-						{ type: 'NumberLiteral', raw: '1', value: 1 }
+						{ type: "NumberLiteral", raw: '1', value: 1 }
 					]
 				}
 			}
@@ -35,17 +35,17 @@ Deno.test("Parse Let Primitives", () => {
 	const ast1 = parse(tokens1);
 
 	const expectedAST1: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'LetStatement',
-				name: { type: 'Identifier', name: 'cylinder' },
+				type: "LetStatement",
+				name: { type: "Identifier", name: "cylinder" },
 				value: {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: 'Cylinder' },
+					type: "CallExpression",
+					callee: { type: "Identifier", name: "Cylinder" },
 					args: [
-						{ type: 'NumberLiteral', raw: '1.', value: 1 },
-						{ type: 'NumberLiteral', raw: '2.', value: 2 }
+						{ type: "NumberLiteral", raw: "1.", value: 1 },
+						{ type: "NumberLiteral", raw: "2.", value: 2 }
 					]
 				}
 			}
@@ -61,17 +61,17 @@ Deno.test("Parse Let Operations", () => {
 	const ast0 = parse(tokens0);
 
 	const expectedAST0: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'LetStatement',
-				name: { type: 'Identifier', name: 'shape' },
+				type: "LetStatement",
+				name: { type: "Identifier", name: "shape" },
 				value: {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: 'union' },
+					type: "CallExpression",
+					callee: { type: "Identifier", name: "union" },
 					args: [
-						{ type: 'Identifier', name: 'sphere' },
-						{ type: 'Identifier', name: 'cylinder' }
+						{ type: "Identifier", name: "sphere" },
+						{ type: "Identifier", name: "cylinder" }
 					]
 				}
 			}
@@ -86,19 +86,19 @@ Deno.test("Parse Let Operations", () => {
 	const ast1 = parse(tokens1);
 
 	const expectedAST1: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'LetStatement',
-				name: { type: 'Identifier', name: 'rotated' },
+				type: "LetStatement",
+				name: { type: "Identifier", name: "rotated" },
 				value: {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: 'rotate' },
+					type: "CallExpression",
+					callee: { type: "Identifier", name: "rotate" },
 					args: [
-						{ type: 'Identifier', name: 'shape' },
-						{ type: 'NumberLiteral', raw: '0.', value: 0 },
-						{ type: 'NumberLiteral', raw: '45.', value: 45 },
-						{ type: 'NumberLiteral', raw: '0.', value: 0 }
+						{ type: "Identifier", name: "shape" },
+						{ type: "NumberLiteral", raw: "0.", value: 0 },
+						{ type: "NumberLiteral", raw: "45.", value: 45 },
+						{ type: "NumberLiteral", raw: "0.", value: 0 }
 					]
 				}
 			}
@@ -114,13 +114,13 @@ Deno.test("Parse Render Statement", () => {
 	const ast = parse(tokens);
 
 	const expectedAST: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'RenderStatement',
+				type: "RenderStatement",
 				argument: {
-					type: 'Identifier',
-					name: 'rotated'
+					type: "Identifier",
+					name: "rotated"
 				}
 			}
 		]
@@ -135,21 +135,21 @@ Deno.test("Nested Expressions", () => {
 	const ast0 = parse(tokens0);
 
 	const expectedAST0: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'RenderStatement',
+				type: "RenderStatement",
 				argument: {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: 'union' },
+					type: "CallExpression",
+					callee: { type: "Identifier", name: "union" },
 					args: [
-						{ type: 'Identifier', name: 'sphere' },
+						{ type: "Identifier", name: "sphere" },
 						{
-							type: 'CallExpression',
-							callee: { type: 'Identifier', name: 'intersection' },
+							type: "CallExpression",
+							callee: { type: "Identifier", name: "intersection" },
 							args: [
-								{ type: 'Identifier', name: 'cylinder' },
-								{ type: 'Identifier', name: 'cube' }
+								{ type: "Identifier", name: "cylinder" },
+								{ type: "Identifier", name: "cube" }
 							]
 						}
 					]
@@ -166,48 +166,48 @@ Deno.test("Nested Expressions", () => {
 	const ast1 = parse(tokens1);
 
 	const expectedAST1: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'LetStatement',
-				name: { type: 'Identifier', name: 'complex' },
+				type: "LetStatement",
+				name: { type: "Identifier", name: "complex" },
 				value: {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: 'difference' },
+					type: "CallExpression",
+					callee: { type: "Identifier", name: "difference" },
 					args: [
 						{
-							type: 'CallExpression',
-							callee: { type: 'Identifier', name: 'Sphere' },
+							type: "CallExpression",
+							callee: { type: "Identifier", name: "Sphere" },
 							args: [
-								{ type: 'NumberLiteral', raw: '4.2', value: 4.2 }
+								{ type: "NumberLiteral", raw: "4.2", value: 4.2 }
 							]
 						},
 						{
-							type: 'CallExpression',
-							callee: { type: 'Identifier', name: 'union' },
+							type: "CallExpression",
+							callee: { type: "Identifier", name: "union" },
 							args: [
 								{
-									type: 'CallExpression',
-									callee: { type: 'Identifier', name: 'Cylinder' },
+									type: "CallExpression",
+									callee: { type: "Identifier", name: "Cylinder" },
 									args: [
-										{ type: 'NumberLiteral', raw: '1.', value: 1 },
-										{ type: 'NumberLiteral', raw: '2.', value: 2 }
+										{ type: "NumberLiteral", raw: "1.", value: 1 },
+										{ type: "NumberLiteral", raw: "2.", value: 2 }
 									]
 								},
 								{
-									type: 'CallExpression',
-									callee: { type: 'Identifier', name: 'translate' },
+									type: "CallExpression",
+									callee: { type: "Identifier", name: "translate" },
 									args: [
 										{
-											type: 'CallExpression',
-											callee: { type: 'Identifier', name: 'Cube' },
+											type: "CallExpression",
+											callee: { type: "Identifier", name: "Cube" },
 											args: [
-												{ type: 'NumberLiteral', raw: '1.', value: 1 }
+												{ type: "NumberLiteral", raw: "1.", value: 1 }
 											]
 										},
-										{ type: 'NumberLiteral', raw: '0.', value: 0 },
-										{ type: 'NumberLiteral', raw: '0.', value: 0 },
-										{ type: 'NumberLiteral', raw: '5.', value: 5 }
+										{ type: "NumberLiteral", raw: "0.", value: 0 },
+										{ type: "NumberLiteral", raw: "0.", value: 0 },
+										{ type: "NumberLiteral", raw: "5.", value: 5 }
 									]
 								}
 							]
@@ -240,52 +240,52 @@ let nested = union(
 	const ast2 = parse(tokens2);
 
 	const expectedAST2: AST.ProgramNode = {
-		type: 'Program',
+		type: "Program",
 		statements: [
 			{
-				type: 'LetStatement',
-				name: { type: 'Identifier', name: 'nested' },
+				type: "LetStatement",
+				name: { type: "Identifier", name: "nested" },
 				value: {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: 'union' },
+					type: "CallExpression",
+					callee: { type: "Identifier", name: "union" },
 					args: [
 						{
-							type: 'CallExpression',
-							callee: { type: 'Identifier', name: 'difference' },
+							type: "CallExpression",
+							callee: { type: "Identifier", name: "difference" },
 							args: [
 								{
-									type: 'CallExpression',
-									callee: { type: 'Identifier', name: 'Sphere' },
+									type: "CallExpression",
+									callee: { type: "Identifier", name: "Sphere" },
 									args: [
-										{ type: 'NumberLiteral', raw: '3.', value: 3 }
+										{ type: "NumberLiteral", raw: "3.", value: 3 }
 									]
 								},
 								{
-									type: 'CallExpression',
-									callee: { type: 'Identifier', name: 'union' },
+									type: "CallExpression",
+									callee: { type: "Identifier", name: "union" },
 									args: [
 										{
-											type: 'CallExpression',
-											callee: { type: 'Identifier', name: 'Cylinder' },
+											type: "CallExpression",
+											callee: { type: "Identifier", name: "Cylinder" },
 											args: [
-												{ type: 'NumberLiteral', raw: '1.', value: 1 },
-												{ type: 'NumberLiteral', raw: '2.', value: 2 }
+												{ type: "NumberLiteral", raw: "1.", value: 1 },
+												{ type: "NumberLiteral", raw: "2.", value: 2 }
 											]
 										},
 										{
-											type: 'CallExpression',
-											callee: { type: 'Identifier', name: 'translate' },
+											type: "CallExpression",
+											callee: { type: "Identifier", name: "translate" },
 											args: [
 												{
-													type: 'CallExpression',
-													callee: { type: 'Identifier', name: 'Cube' },
+													type: "CallExpression",
+													callee: { type: "Identifier", name: "Cube" },
 													args: [
-														{ type: 'NumberLiteral', raw: '1.', value: 1 }
+														{ type: "NumberLiteral", raw: "1.", value: 1 }
 													]
 												},
-												{ type: 'NumberLiteral', raw: '0.', value: 0 },
-												{ type: 'NumberLiteral', raw: '0.', value: 0 },
-												{ type: 'NumberLiteral', raw: '5.', value: 5 }
+												{ type: "NumberLiteral", raw: "0.", value: 0 },
+												{ type: "NumberLiteral", raw: "0.", value: 0 },
+												{ type: "NumberLiteral", raw: "5.", value: 5 }
 											]
 										}
 									]
@@ -293,30 +293,30 @@ let nested = union(
 							]
 						},
 						{
-							type: 'CallExpression',
-							callee: { type: 'Identifier', name: 'intersection' },
+							type: "CallExpression",
+							callee: { type: "Identifier", name: "intersection" },
 							args: [
 								{
-									type: 'CallExpression',
-									callee: { type: 'Identifier', name: 'Cube' },
+									type: "CallExpression",
+									callee: { type: "Identifier", name: "Cube" },
 									args: [
-										{ type: 'NumberLiteral', raw: '4.', value: 4 }
+										{ type: "NumberLiteral", raw: "4.", value: 4 }
 									]
 								},
 								{
-									type: 'CallExpression',
-									callee: { type: 'Identifier', name: 'translate' },
+									type: "CallExpression",
+									callee: { type: "Identifier", name: "translate" },
 									args: [
 										{
-											type: 'CallExpression',
-											callee: { type: 'Identifier', name: 'Sphere' },
+											type: "CallExpression",
+											callee: { type: "Identifier", name: "Sphere" },
 											args: [
-												{ type: 'NumberLiteral', raw: '2.', value: 2 }
+												{ type: "NumberLiteral", raw: "2.", value: 2 }
 											]
 										},
-										{ type: 'NumberLiteral', raw: '5.', value: 5 },
-										{ type: 'NumberLiteral', raw: '0.', value: 0 },
-										{ type: 'NumberLiteral', raw: '0.', value: 0 }
+										{ type: "NumberLiteral", raw: "5.", value: 5 },
+										{ type: "NumberLiteral", raw: "0.", value: 0 },
+										{ type: "NumberLiteral", raw: "0.", value: 0 }
 									]
 								}
 							]
@@ -329,7 +329,6 @@ let nested = union(
 
 	assertEquals(ast2, expectedAST2);
 });
-
 
 
 Deno.test("Missing Characters", () => {
@@ -345,7 +344,7 @@ Deno.test("Missing Characters", () => {
 	const tokens2 = lex(sourceLine2);
 	assertThrows(() => parse(tokens2), ParserError, "Expected expression");
 
-	const sourceLine3 = "circle = Circle(1.5);"; // Missing 'let' keyword
+	const sourceLine3 = "circle = Circle(1.5);"; // Missing "let" keyword
 	const tokens3 = lex(sourceLine3);
 	assertThrows(() => parse(tokens3), ParserError, "Expected expression");
 
@@ -359,11 +358,11 @@ Deno.test("Unexpected Tokens", () => {
 	const tokens0 = lex(sourceLine0);
 	assertThrows(() => parse(tokens0), ParserError, "Expected end of input after expression");
 
-	const sourceLine1 = "LET sphere = Sphere(1.);"; // 'LET' is not a valid keyword (should be lowercase)
+	const sourceLine1 = "LET sphere = Sphere(1.);"; // "LET" is not a valid keyword (should be lowercase)
 	const tokens1 = lex(sourceLine1);
 	assertThrows(() => parse(tokens1), ParserError, "Expected expression");
 
-	const sourceLine2 = "let s = translate((cube, 0., 0., 3);"; // Extra parenthesis before 'cube'
+	const sourceLine2 = "let s = translate((cube, 0., 0., 3);"; // Extra parenthesis before "cube"
 	const tokens2 = lex(sourceLine2);
 	assertThrows(() => parse(tokens2), ParserError, "Expected '(' after function name");
 

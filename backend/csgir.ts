@@ -12,7 +12,7 @@ export interface FlatToken {
   data: number;
 }
 
-export type ObjectRefKind = "p" | "t" | "c";
+export type ObjectRefKind = 'p' | 't' | 'c';
 
 export interface ObjectRef {
 	kind: ObjectRefKind;
@@ -82,7 +82,7 @@ function fail(message: string): never {
 }
 
 function isWhitespace(ch: string): boolean {
-	return ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+	return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
 }
 
 function skipWhitespace(input: string, start: number): number {
@@ -92,11 +92,11 @@ function skipWhitespace(input: string, start: number): number {
 }
 
 function findMatchingBracket(input: string, openIndex: number): number {
-	if (input[openIndex] !== "[") fail(`expected '[' at index ${openIndex}`);
+	if (input[openIndex] !== '[') fail(`expected '[' at index ${openIndex}`);
 	let depth = 0;
 	for (let i = openIndex; i < input.length; i++) {
-		if (input[i] === "[") depth++;
-		else if (input[i] === "]") {
+		if (input[i] === '[') depth++;
+		else if (input[i] === ']') {
 			depth--;
 			if (depth === 0) return i;
 		}
@@ -105,11 +105,11 @@ function findMatchingBracket(input: string, openIndex: number): number {
 }
 
 function findMatchingBrace(input: string, openIndex: number): number {
-	if (input[openIndex] !== "{") fail(`expected '{' at index ${openIndex}`);
+	if (input[openIndex] !== '{') fail(`expected '{' at index ${openIndex}`);
 	let depth = 0;
 	for (let i = openIndex; i < input.length; i++) {
-		if (input[i] === "{") depth++;
-		else if (input[i] === "}") {
+		if (input[i] === '{') depth++;
+		else if (input[i] === '}') {
 			depth--;
 			if (depth === 0) return i;
 		}
@@ -128,12 +128,12 @@ function parseBlock(input: string, openIndex: number): { content: string; nextIn
 function parseNumberList(raw: string): number[] {
 	const text = raw.trim();
 	if (text.length === 0) return [];
-	return text.split(",").map((part) => part.trim()).map((part) => {
+	return text.split(',').map((part) => part.trim()).map((part) => {
 		if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(part)) {
-			fail(`invalid numeric literal '${part}'`);
+			fail(`invalid numeric literal "${part}"`);
 		}
 		const n = Number(part);
-		if (!Number.isFinite(n)) fail(`non-finite numeric literal '${part}'`);
+		if (!Number.isFinite(n)) fail(`non-finite numeric literal "${part}"`);
 		return n;
 	});
 }
@@ -141,7 +141,7 @@ function parseNumberList(raw: string): number[] {
 function parseRef(raw: string): ObjectRef {
 	const text = raw.trim();
 	const match = /^([ptc])\.(\d+)$/.exec(text);
-	if (!match) fail(`invalid object reference '${text}'`);
+	if (!match) fail(`invalid object reference "${text}"`);
 	return {
 		kind: match[1] as ObjectRefKind,
 		index: Number(match[2]),
@@ -156,13 +156,13 @@ function parseEntryBlocks(sectionContent: string): Array<{ head: string; payload
 	while (i < sectionContent.length) {
 		i = skipWhitespace(sectionContent, i);
 		if (i >= sectionContent.length) break;
-		if (sectionContent[i] === ",") {
+		if (sectionContent[i] === ',') {
 			i++;
 			continue;
 		}
 
-		const open = sectionContent.indexOf("[", i);
-		if (open === -1) fail(`missing '[' for section entry near '${sectionContent.slice(i).trim()}'`);
+		const open = sectionContent.indexOf('[', i);
+		if (open === -1) fail(`missing '[' for section entry near "${sectionContent.slice(i).trim()}"`);
 
 		const head = sectionContent.slice(i, open).trim();
 		if (!head) fail("empty section entry head");
@@ -180,7 +180,7 @@ function parseEntryBlocks(sectionContent: string): Array<{ head: string; payload
 		entries.push({ head, payload, attrs });
 
 		i = j;
-		while (i < sectionContent.length && (isWhitespace(sectionContent[i]) || sectionContent[i] === ",")) i++;
+		while (i < sectionContent.length && (isWhitespace(sectionContent[i]) || sectionContent[i] === ',')) i++;
 	}
 
 	return entries;
@@ -189,12 +189,12 @@ function parseEntryBlocks(sectionContent: string): Array<{ head: string; payload
 function parseRenders(sectionContent: string): ObjectRef[] {
 	const trimmed = sectionContent.trim();
 	if (!trimmed) return [];
-	return trimmed.split(",").map((part) => part.trim()).filter((part) => part.length > 0).map(parseRef);
+	return trimmed.split(',').map((part) => part.trim()).filter((part) => part.length > 0).map(parseRef);
 }
 
 function splitTopLevelItems(s: string): string[] {
 	const out: string[] = [];
-	let buf = '';
+	let buf = "";
 	let depth = 0;
 	for (let i = 0; i < s.length; i++) {
 		const ch = s[i];
@@ -210,7 +210,7 @@ function splitTopLevelItems(s: string): string[] {
 		}
 		if (ch === ',' && depth === 0) {
 			if (buf.trim().length > 0) out.push(buf.trim());
-			buf = '';
+			buf = "";
 			continue;
 		}
 		buf += ch;
@@ -220,29 +220,29 @@ function splitTopLevelItems(s: string): string[] {
 }
 
 function validateReference(ref: ObjectRef, ir: Pick<ParsedIR, "primitives" | "transformations" | "csg">): void {
-	if (ref.kind === "p" && ref.index >= ir.primitives.length) {
-		fail(`reference '${ref.raw}' out of range for Primitives`);
+	if (ref.kind === 'p' && ref.index >= ir.primitives.length) {
+		fail(`reference "${ref.raw}" out of range for Primitives`);
 	}
-	if (ref.kind === "t" && ref.index >= ir.transformations.length) {
-		fail(`reference '${ref.raw}' out of range for Transformations`);
+	if (ref.kind === 't' && ref.index >= ir.transformations.length) {
+		fail(`reference "${ref.raw}" out of range for Transformations`);
 	}
-	if (ref.kind === "c" && ref.index >= ir.csg.length) {
-		fail(`reference '${ref.raw}' out of range for CSG`);
+	if (ref.kind === 'c' && ref.index >= ir.csg.length) {
+		fail(`reference "${ref.raw}" out of range for CSG`);
 	}
 }
 
 function parseRequiredSection(programBody: string, sectionName: string, cursor: number): { content: string; nextCursor: number;} {
 	const start = programBody.indexOf(sectionName, cursor);
-	if (start === -1) fail(`missing required section '${sectionName}'`);
+	if (start === -1) fail(`missing required section "${sectionName}"`);
 
 	const between = programBody.slice(cursor, start).trim();
 	if (between.length > 0) {
-		fail(`unexpected tokens before section '${sectionName}': '${between}'`);
+		fail(`unexpected tokens before section "${sectionName}": "${between}"`);
 	}
 
 	let open = start + sectionName.length;
 	open = skipWhitespace(programBody, open);
-	if (programBody[open] !== "[") fail(`section '${sectionName}' must be followed by '['`);
+	if (programBody[open] !== '[') fail(`section "${sectionName}" must be followed by '['`);
 
 	const block = parseBlock(programBody, open);
 
@@ -257,7 +257,7 @@ export function parseIR(irCode: string): ParsedIR {
 	if (!input) fail("input is empty");
 
 	let i = skipWhitespace(input, 0);
-	if (input[i] !== "[") fail("input must begin with '['");
+	if (input[i] !== '[') fail("input must begin with '['");
 
 	const firstBlock = parseBlock(input, i);
 	const firstText = firstBlock.content.trim();
@@ -269,7 +269,7 @@ export function parseIR(irCode: string): ParsedIR {
 	if (/^\d+\.\d+\.\d+$/.test(firstText)) {
 		version = firstText;
 		i = skipWhitespace(input, firstBlock.nextIndex);
-		if (input[i] !== "[") fail("expected program block after version block");
+		if (input[i] !== '[') fail("expected program block after version block");
 		const programBlock = parseBlock(input, i);
 		programBody = programBlock.content;
 		tailIndex = programBlock.nextIndex;
@@ -292,7 +292,7 @@ export function parseIR(irCode: string): ParsedIR {
 	cursor = csgSection.nextCursor;
 
 	if (programBody.slice(cursor).trim().length > 0) {
-		fail(`unexpected tokens after CSG section: '${programBody.slice(cursor).trim()}'`);
+		fail(`unexpected tokens after CSG section: "${programBody.slice(cursor).trim()}"`);
 	}
 
 	const renders = parseRenders(rendersSection.content);
@@ -300,7 +300,7 @@ export function parseIR(irCode: string): ParsedIR {
 	const primitiveEntries = parseEntryBlocks(primitivesSection.content);
 	const primitives: PrimitiveIR[] = primitiveEntries.map((entry) => {
 		if (!VALID_PRIMITIVES.has(entry.head)) {
-			fail(`unsupported primitive '${entry.head}'`);
+			fail(`unsupported primitive "${entry.head}"`);
 		}
 		const prim: PrimitiveIR = {
 			kind: entry.head as PrimitiveKind,
@@ -314,7 +314,7 @@ export function parseIR(irCode: string): ParsedIR {
 				if (!m) continue;
 				const aname = m[1];
 				const aargs = m[2];
-				if (aname === 'Color') {
+				if (aname === "Color") {
 					const nums = parseNumberList(aargs);
 					if (nums.length >= 3) {
 						// normalize 0..255 -> 0..1 if any value > 1
@@ -337,7 +337,7 @@ export function parseIR(irCode: string): ParsedIR {
 		const source = parseRef(entry.head);
 		const matrix = parseNumberList(entry.payload);
 		if (matrix.length !== 16) {
-			fail(`transformation '${entry.head}' must contain exactly 16 matrix values`);
+			fail(`transformation "${entry.head}" must contain exactly 16 matrix values`);
 		}
 		const tr: TransformationIR = { source, matrix };
 		if (entry.attrs) {
@@ -347,7 +347,7 @@ export function parseIR(irCode: string): ParsedIR {
 				if (!m) continue;
 				const aname = m[1];
 				const aargs = m[2];
-				if (aname === 'Color') {
+				if (aname === "Color") {
 					const nums = parseNumberList(aargs);
 					if (nums.length >= 3) {
 						let r = nums[0]; let g = nums[1]; let b = nums[2];
@@ -363,11 +363,11 @@ export function parseIR(irCode: string): ParsedIR {
 	const csgEntries = parseEntryBlocks(csgSection.content);
 	const csg: CSGIR[] = csgEntries.map((entry) => {
 		if (!VALID_CSG_OPS.has(entry.head)) {
-			fail(`unsupported CSG op '${entry.head}'`);
+			fail(`unsupported CSG op "${entry.head}"`);
 		}
-		const refs = entry.payload.split(",").map((part) => part.trim()).filter((part) => part.length > 0).map(parseRef);
+		const refs = entry.payload.split(',').map((part) => part.trim()).filter((part) => part.length > 0).map(parseRef);
 		if (refs.length !== 2) {
-			fail(`CSG op '${entry.head}' must contain exactly 2 object references`);
+			fail(`CSG op "${entry.head}" must contain exactly 2 object references`);
 		}
 		const node: CSGIR = { op: entry.head as CSGOpKind, left: refs[0], right: refs[1] };
 		if (entry.attrs) {
@@ -377,7 +377,7 @@ export function parseIR(irCode: string): ParsedIR {
 				if (!m) continue;
 				const aname = m[1];
 				const aargs = m[2];
-				if (aname === 'Color') {
+				if (aname === "Color") {
 					const nums = parseNumberList(aargs);
 					if (nums.length >= 3) {
 						let r = nums[0]; let g = nums[1]; let b = nums[2];
@@ -411,8 +411,8 @@ export function parseIR(irCode: string): ParsedIR {
 
 
 function refToGlobalIndex(ref: ObjectRef, ir: ParsedIR): number {
-	if (ref.kind === "p") return ref.index;
-	if (ref.kind === "t") return ir.primitives.length + ref.index;
+	if (ref.kind === 'p') return ref.index;
+	if (ref.kind === 't') return ir.primitives.length + ref.index;
 	return ir.primitives.length + ir.transformations.length + ref.index;
 }
 
@@ -477,7 +477,7 @@ export function flattenIR(ir: ParsedIR): { leaves: FlatLeaf[]; tokens: FlatToken
 		}
 		inPath.add(globalIndex);
 
-		if (ref.kind === "p") {
+		if (ref.kind === 'p') {
 			const prim = ir.primitives[ref.index];
 			let kind = PRIM_SPHERE;
 			if (prim.kind === "Cube") kind = PRIM_CUBE;
@@ -524,7 +524,7 @@ export function flattenIR(ir: ParsedIR): { leaves: FlatLeaf[]; tokens: FlatToken
 			return;
 		}
 
-		if (ref.kind === "t") {
+		if (ref.kind === 't') {
 			// Get the transformation type and apply the necessary matrix operation
 			const tr = ir.transformations[ref.index];
 			const invThis = invertAffine(tr.matrix);

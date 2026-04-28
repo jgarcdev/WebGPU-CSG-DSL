@@ -22,13 +22,13 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
   if (!monaco || !monaco.languages) return;
   // avoid double-registration
   const exists = (monaco.languages.getLanguages && monaco.languages.getLanguages()) || [] as Array<{id:string}>;
-  if (exists.some((l) => l.id === 'csgl')) return;
+  if (exists.some((l) => l.id === "csgl")) return;
 
-  monaco.languages.register({ id: 'csgl' });
+  monaco.languages.register({ id: "csgl" });
 
-  monaco.languages.setMonarchTokensProvider('csgl', {
-    defaultToken: '',
-    tokenPostfix: '.csgl',
+  monaco.languages.setMonarchTokensProvider("csgl", {
+    defaultToken: "",
+    tokenPostfix: ".csgl",
     keywords: [
       "let", "const"
     ],
@@ -38,37 +38,37 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
         // Constructors / primitive types (capitalized identifiers)
         [/[A-Z][\w]*/, {
           cases: {
-            '@primitives': 'type',
-            '@default': 'type'
+            "@primitives": "type",
+            "@default": "type"
           }
         }],
         // identifiers and keywords
         [/[a-zA-Z_]\w*/, {
           cases: {
-            '@keywords': 'keyword',
-            '@default': 'identifier'
+            "@keywords": "keyword",
+            "@default": "identifier"
           }
         }],
         // numbers: integers, floats, .5, -2.0, -.5
-        [/-?(?:\d+\.\d*|\.\d+|\d+)/, 'number'],
+        [/-?(?:\d+\.\d*|\.\d+|\d+)/, "number"],
         // comments
-        [/\/\/.*$/, 'comment'],
-        [/\/\*/, 'comment', '@comment'],
+        [/\/\/.*$/, "comment"],
+        [/\/\*/, "comment", "@comment"],
         // brackets, delimiters, operators
-        [/[{}()\[\]]/, '@brackets'],
-        [/[;,]/, 'delimiter'],
-        [/[+\-*/%=<>!]+/, 'operator']
+        [/[{}()\[\]]/, "@brackets"],
+        [/[;,]/, "delimiter"],
+        [/[+\-*/%=<>!]+/, "operator"]
       ],
       comment: [
-        [/[^*]+/, 'comment'],
-        [/\*\//, 'comment', '@pop'],
-        [/./, 'comment']
+        [/[^*]+/, "comment"],
+        [/\*\//, "comment", "@pop"],
+        [/./, "comment"]
       ]
     }
   });
 
-  monaco.languages.setLanguageConfiguration('csgl', {
-    comments: { lineComment: '//', blockComment: ['/*', '*/'] },
+  monaco.languages.setLanguageConfiguration("csgl", {
+    comments: { lineComment: "//", blockComment: ["/*", "*/"] },
     brackets: [['{', '}'], ['(', ')']],
     autoClosingPairs: [
       { open: '{', close: '}' },
@@ -80,19 +80,19 @@ export function setupCSGLLanguage(monaco: MonacoLike) {
     ],
   });
 
-  monaco.editor.defineTheme('csglTheme', {
-    base: 'vs-dark',
+  monaco.editor.defineTheme("csglTheme", {
+    base: "vs-dark",
     inherit: true,
     rules: [
-      { token: 'keyword', foreground: '#af0e49', fontStyle: 'bold' },
-      { token: 'number', foreground: '#d232a7' },
-      { token: 'comment', foreground: '#d991bb', fontStyle: 'italic' },
-      { token: 'identifier', foreground: '#9a51cd' },
-      { token: 'type', foreground: '#6f26c3' }
+      { token: "keyword", foreground: "#af0e49", fontStyle: "bold" },
+      { token: "number", foreground: "#d232a7" },
+      { token: "comment", foreground: "#d991bb", fontStyle: "italic" },
+      { token: "identifier", foreground: "#9a51cd" },
+      { token: "type", foreground: "#6f26c3" }
     ],
     colors: {
-      'editor.foreground': '#FFFFFF',
-      'editor.background': '#1e1e1e'
+      "editor.foreground": "#FFFFFF",
+      "editor.background": "#1e1e1e"
     }
   });
 }

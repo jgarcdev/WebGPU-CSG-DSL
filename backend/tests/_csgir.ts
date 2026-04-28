@@ -5,6 +5,7 @@ import { sema } from "../../compiler/sema.ts";
 import { lowerIR } from "../../compiler/csgIR.ts";
 import { flattenIR, parseIR } from "../csgir.ts";
 
+
 Deno.test("parseIR handles compiler-emitted IR", () => {
   const src = `let s = Sphere(1.0);
 let c = Cube(2.0);
@@ -23,7 +24,7 @@ Render(obj);`;
   assertEquals(ir.transformations.length, 1);
   assertEquals(ir.csg.length, 1);
   assertEquals(ir.renders.length, 1);
-  assertEquals(ir.renders[0].kind, "c");
+  assertEquals(ir.renders[0].kind, 'c');
   assertEquals(ir.renders[0].index, 0);
 });
 

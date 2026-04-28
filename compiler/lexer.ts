@@ -1,23 +1,23 @@
-import { LexerError } from './errors.ts';
+import { LexerError } from "./errors.ts";
 
 
 export type TokenType =
-  | 'Identifier'
-  | 'Number'
-  | 'Keyword'
-  | 'Plus'
-  | 'Minus'
-  | 'Star'
-  | 'Slash'
-  | 'LParen'
-  | 'RParen'
-  | 'LBrace'
-  | 'RBrace'
-  | 'Comma'
-  | 'Equals'
-  | 'Semicolon'
-  | 'EOL'
-  | 'EOF';
+  | "Identifier"
+  | "Number"
+  | "Keyword"
+  | "Plus"
+  | "Minus"
+  | "Star"
+  | "Slash"
+  | "LParen"
+  | "RParen"
+  | "LBrace"
+  | "RBrace"
+  | "Comma"
+  | "Equals"
+  | "Semicolon"
+  | "EOL"
+  | "EOF";
 
 export type Token = {
   type: TokenType;
@@ -34,10 +34,10 @@ export function lex(source: string): Token[] {
   let line = 1;
   let column = 1;
 
-  const peek = (offset = 0): string => source[index + offset] ?? '';
+  const peek = (offset = 0): string => source[index + offset] ?? "";
 
   const advance = (): string => {
-    const ch = source[index++] ?? '';
+    const ch = source[index++] ?? "";
     if (ch === '\n') {
       line += 1;
       column = 1;
@@ -63,7 +63,7 @@ export function lex(source: string): Token[] {
     const start = index;
     const first = peek();
     if (!isLetter(first)) {
-      throw new LexerError('Expected identifier', tokenLine, tokenColumn);
+      throw new LexerError("Expected identifier", tokenLine, tokenColumn);
     }
     advance();
     while (isIdentifierPart(peek())) {
@@ -71,12 +71,12 @@ export function lex(source: string): Token[] {
     }
     const lexeme = source.slice(start, index);
 
-    if (lexeme === 'let' || lexeme === 'Render' || lexeme === 'const') {
-      addToken('Keyword', lexeme, tokenLine, tokenColumn);
+    if (lexeme === "let" || lexeme === "Render" || lexeme === "const") {
+      addToken("Keyword", lexeme, tokenLine, tokenColumn);
       return;
     }
 
-    addToken('Identifier', lexeme, tokenLine, tokenColumn);
+    addToken("Identifier", lexeme, tokenLine, tokenColumn);
   };
 
   const readNumber = () => {
@@ -88,12 +88,12 @@ export function lex(source: string): Token[] {
       advance();
     }
 
-    // two main forms: digits[.digits?]  OR  .digits
+    // two main forms: digits[.digits?] or .digits
     if (isDigit(peek())) {
       // consume integer part
       while (isDigit(peek())) advance();
 
-      // fractional part (optional). allow trailing dot (e.g., '1.')
+      // fractional part (optional). allow trailing dot (e.g., "1.")
       if (peek() === '.') {
         advance();
         if (isDigit(peek())) {
@@ -105,26 +105,26 @@ export function lex(source: string): Token[] {
       // leading-dot float: must have digits after
       advance();
       if (!isDigit(peek())) {
-        throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+        throw new LexerError("Invalid number literal", tokenLine, tokenColumn);
       }
       while (isDigit(peek())) advance();
     } else {
       // sign only or invalid start
-      throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+      throw new LexerError("Invalid number literal", tokenLine, tokenColumn);
     }
 
-    // disallow trailing letters like scientific notation '1e' or identifiers immediately after number
+    // disallow trailing letters like scientific notation "1e" or identifiers immediately after number
     const next = peek();
     // multiple dots are invalid (e.g. 1.2.3)
     if (next === '.') {
-      throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+      throw new LexerError("Invalid number literal", tokenLine, tokenColumn);
     }
     if (isLetter(next) || next === '_') {
-      throw new LexerError('Invalid number literal', tokenLine, tokenColumn);
+      throw new LexerError("Invalid number literal", tokenLine, tokenColumn);
     }
 
     const lexeme = source.slice(start, index);
-    addToken('Number', lexeme, tokenLine, tokenColumn);
+    addToken("Number", lexeme, tokenLine, tokenColumn);
   };
 
   while (index < source.length) {
@@ -132,7 +132,7 @@ export function lex(source: string): Token[] {
 
     if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n') {
       if (ch === '\n') {
-        addToken('EOL', ch, line, column);
+        addToken("EOL", ch, line, column);
       }
 
       advance();
@@ -140,7 +140,7 @@ export function lex(source: string): Token[] {
     }
 
     if (ch === '/' && peek(1) === '/') {
-      while (peek() !== '\n' && peek() !== '') {
+      while (peek() !== '\n' && peek() !== "") {
         advance();
       }
       continue;
@@ -152,8 +152,8 @@ export function lex(source: string): Token[] {
       advance();
       advance();
       while (!(peek() === '*' && peek(1) === '/')) {
-        if (peek() === '') {
-          throw new LexerError('Unterminated block comment', commentLine, commentColumn);
+        if (peek() === "") {
+          throw new LexerError("Unterminated block comment", commentLine, commentColumn);
         }
         advance();
       }
@@ -167,40 +167,40 @@ export function lex(source: string): Token[] {
 
     switch (ch) {
       case '*':
-        addToken('Star', ch, tokenLine, tokenColumn);
+        addToken("Star", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case '/':
         // comments were handled earlier; here plain slash is an operator
-        addToken('Slash', ch, tokenLine, tokenColumn);
+        addToken("Slash", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case '(':
-        addToken('LParen', ch, tokenLine, tokenColumn);
+        addToken("LParen", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case '{':
-        addToken('LBrace', ch, tokenLine, tokenColumn);
+        addToken("LBrace", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case '}':
-        addToken('RBrace', ch, tokenLine, tokenColumn);
+        addToken("RBrace", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case ')':
-        addToken('RParen', ch, tokenLine, tokenColumn);
+        addToken("RParen", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case ',':
-        addToken('Comma', ch, tokenLine, tokenColumn);
+        addToken("Comma", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case '=':
-        addToken('Equals', ch, tokenLine, tokenColumn);
+        addToken("Equals", ch, tokenLine, tokenColumn);
         advance();
         continue;
       case ';':
-        addToken('Semicolon', ch, tokenLine, tokenColumn);
+        addToken("Semicolon", ch, tokenLine, tokenColumn);
         advance();
         continue;
       default:
@@ -209,9 +209,9 @@ export function lex(source: string): Token[] {
 
     // Handle plus/minus: decide whether operator or numeric sign based on previous token
     if (ch === '+' || ch === '-') {
-      const prev = [...tokens].reverse().find(t => t.type !== 'EOL' && t.type !== 'Semicolon');
-      if (prev && (prev.type === 'Number' || prev.type === 'Identifier' || prev.type === 'RParen')) {
-        addToken(ch === '+' ? 'Plus' : 'Minus', ch, tokenLine, tokenColumn);
+      const prev = [...tokens].reverse().find(t => t.type !== "EOL" && t.type !== "Semicolon");
+      if (prev && (prev.type === "Number" || prev.type === "Identifier" || prev.type === "RParen")) {
+        addToken(ch === '+' ? "Plus" : "Minus", ch, tokenLine, tokenColumn);
         advance();
         continue;
       }
@@ -228,10 +228,10 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    throw new LexerError(`Unexpected character '${ch}'`, tokenLine, tokenColumn);
+    throw new LexerError(`Unexpected character "${ch}"`, tokenLine, tokenColumn);
   }
 
-  // addToken('EOF', '', line, column);
+  // addToken("EOF", "", line, column);
   return tokens;
 }
 

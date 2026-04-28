@@ -1,32 +1,43 @@
-Program         = { Statement } ;
+Program             = { Separator } [ ConstBlock { Separator } ]
+                      { Statement { Separator } } ;
 
-Statement       = LetStatement
-                | RenderStatement
-                | ExpressionStatement ;
+ConstBlock          = "const" "{" { ConstDeclaration { Separator } } "}" ;
+ConstDeclaration    = Identifier "=" Expression [ ";" ] ;
 
-LetStatement    = "let" Identifier "=" Expression ;
+Statement           = LetStatement
+                    | RenderStatement
+                    | ExpressionStatement ;
 
-RenderStatement = "Render" "(" Expression ")" ;
-
+LetStatement        = "let" Identifier "=" Expression ;
+RenderStatement     = "Render" "(" Expression ")" ;
 ExpressionStatement = Expression ;
 
-Expression      = CallExpression
-                | Identifier ;
+Expression          = AdditiveExpression ;
+AdditiveExpression  = MultiplicativeExpression
+                    { ("+" | "-") MultiplicativeExpression } ;
+MultiplicativeExpression = PrimaryExpression
+                    { ("*" | "/") PrimaryExpression } ;
 
-CallExpression  = Identifier "(" Arguments? ")" ;
+PrimaryExpression   = Number
+                    | Identifier
+                    | CallExpression
+                    | "(" Expression ")" ;
 
-Arguments       = Expression { "," Expression } ;
+CallExpression      = Identifier "(" [ Arguments ] ")" ;
+Arguments           = Expression { "," Expression } ;
 
-Identifier      = CapitalizedIdentifier
-                | LowercaseIdentifier ;
+Identifier          = Letter { Letter | Digit | "_" } ;
 
-CapitalizedIdentifier = UppercaseLetter { Letter | Digit } ;
-LowercaseIdentifier   = LowercaseLetter { Letter | Digit } ;
+Number              = ["+" | "-"]
+                      ( Digit { Digit } [ "." { Digit } ]
+                      | "." Digit { Digit } ) ;
 
-Number          = ["+" | "-"] ( Digit { Digit } [ "." Digit { Digit } ]
-                  | "." Digit { Digit } ) ;
+Separator           = ";" | EndOfLine ;
 
-Letter          = UppercaseLetter | LowercaseLetter ;
-UppercaseLetter = "A"…"Z" ;
-LowercaseLetter = "a"…"z" ;
-Digit           = "0"…"9" ;
+Comment             = "//" { NotEndOfLine } EndOfLine
+                    | "/*" { NotCommentEnd } "*/" ;
+
+Letter              = UppercaseLetter | LowercaseLetter ;
+UppercaseLetter     = 'A'…'Z' ;
+LowercaseLetter     = 'a'…'z' ;
+Digit               = '0'…'9' ;

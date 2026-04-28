@@ -1,5 +1,41 @@
 # CSG DSL
 
+## Core Syntax
+
+- Program shape:
+	- Optional top-level `const { ... }` block first
+	- Then statements (`let`, `Render(...)`, or expression statements)
+- Separators:
+	- Newlines and `;` are both valid statement/declaration separators
+	- `;` is optional in many places because end-of-line is also accepted
+- Keywords are case-sensitive:
+	- `let` is lowercase
+	- `Render` is uppercase `R`
+- Identifiers:
+	- Must start with a letter
+	- Can contain letters, digits, and `_` after the first character
+- Comments:
+	- Line comments with `//`
+	- Block comments with `/* ... */`
+
+Expressions:
+- Primary: number, identifier, call, or parenthesized expression
+- Multiplicative: `*` and `/`
+- Additive: `+` and `-`
+
+Example:
+
+```csgl
+const {
+	H_ATOM_R = 0.04;
+	O_ATOM_R = H_ATOM_R * 1.3 * 1.1;
+}
+
+let sphere = Sphere(O_ATOM_R);
+let moved = translate(sphere, -0.3, .2, 0);
+Render(moved);
+```
+
 To render an object:
 ```
 let object = ...;
@@ -17,10 +53,17 @@ Comments:
 
 ## Data Types
 
-Float
+Number
+- `2`, `-2`
 - `2.0`, `-2.0`
 - `0.2`, `-0.2`
 - `.5`, `-.5`
+- `1.`
+
+Constant expressions
+- Numeric constants can be built from arithmetic expressions.
+- Supported operators: `+`, `-`, `*`, `/`.
+- Parentheses are supported for grouping.
 
 Object
 - `SphereObject`, `CubeObject`, `CylinderObject`
@@ -59,6 +102,20 @@ let octahedron = Octahedron(1.5);
 let translatedSphere = translate(sphere, 1.0, 0.0, 0.0)
 let rotatedCube = rotate(cube, 0.0, 45.0, 0.0)
 let scaledCylinder = scale(cylinder, 1.0, 2.0, 1.0)
+```
+
+## Constants
+
+Top-level constants are defined in a `const` block that must appear before non-const statements.
+
+```csgl
+const {
+	BASE = 0.3;
+	HEIGHT = BASE * 2;
+}
+
+let shape = Cylinder(BASE, HEIGHT)
+Render(shape)
 ```
 
 ## Operations
